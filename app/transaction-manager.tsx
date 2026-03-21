@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import React, { useState, FormEvent } from "react";
 import {
   Dialog,
   DialogTrigger,
@@ -18,6 +18,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 type CreditCard = {
@@ -37,24 +39,47 @@ type Transaction = {
   createdAt: string;
 };
 
-type TransactionManagerProps = {
-  onLogout: () => void;
+type Period = {
+  id: string;
+  name: string;
+  createdAt: string;
+  cards: CreditCard[];
+  transactions: Transaction[];
+  bankTotal: number;
+  visibleCardIds: Record<string, boolean>;
 };
 
-export function TransactionManager({ onLogout }: TransactionManagerProps) {
-  const [cards, setCards] = useState<CreditCard[]>([]);
+type TransactionManagerProps = {
+  onLogout: () => void;
+  periods: Period[];
+  currentPeriod?: Period;
+  onCreatePeriod: (name: string) => void;
+  onSwitchPeriod: (periodId: string) => void;
+  onUpdatePeriodData: (periodId: string, data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'visibleCardIds'>>) => void;
+  onDeletePeriod: (periodId: string) => void;
+};
+
+export function TransactionManager({ 
+  onLogout, 
+  periods, 
+  currentPeriod, 
+  onCreatePeriod, 
+  onSwitchPeriod, 
+  onUpdatePeriodData,
+  onDeletePeriod 
+}: TransactionManagerProps) {
+  // Local UI state (not persisted)
   const [cardName, setCardName] = useState("");
   const [cardLimit, setCardLimit] = useState("");
   const [cardColor, setCardColor] = useState("#0ea5e9");
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string>("");
 
-  const [bankTotal, setBankTotal] = useState(0);
   const [bankAmount, setBankAmount] = useState("");
   const [bankDescription, setBankDescription] = useState("");
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>(currentPeriod?.transactions || []);
   const [txAmount, setTxAmount] = useState("");
   const [txDescription, setTxDescription] = useState("");
   const [txMethod, setTxMethod] = useState<"debit" | "card" | "bank">("debit");
@@ -64,12 +89,57 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
 
   const [showDebit, setShowDebit] = useState(true);
   const [showBank, setShowBank] = useState(true);
-  const [visibleCardIds, setVisibleCardIds] = useState<Record<string, boolean>>({});
+  const [visibleCardIds, setVisibleCardIds] = useState<Record<string, boolean>>(currentPeriod?.visibleCardIds || {});
+  const [bankTotal, setBankTotal] = useState(currentPeriod?.bankTotal || 0);
+  const [cards, setCards] = useState<CreditCard[]>(currentPeriod?.cards || []);
 
   const [txPage, setTxPage] = useState(1);
   const [txSortBy, setTxSortBy] = useState<"date" | "amount" | "method">("date");
   const [txSortOrder, setTxSortOrder] = useState<"asc" | "desc">("desc");
   const txPageSize = 5;
+
+  // Period management state
+  const [newPeriodName, setNewPeriodName] = useState("");
+  const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
+
+  // Update local state when currentPeriod changes
+  React.useEffect(() => {
+    if (currentPeriod) {
+      setTransactions(currentPeriod.transactions);
+      setVisibleCardIds(currentPeriod.visibleCardIds);
+      setBankTotal(currentPeriod.bankTotal);
+      setCards(currentPeriod.cards);
+    }
+  }, [currentPeriod]);
+
+  // Helper function to update period data
+  const updateCurrentPeriodData = (data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'visibleCardIds'>>) => {
+    if (currentPeriod) {
+      onUpdatePeriodData(currentPeriod.id, data);
+    }
+  };
+
+  // Period management functions
+  const handleCreatePeriod = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (newPeriodName.trim()) {
+      onCreatePeriod(newPeriodName.trim());
+      setNewPeriodName("");
+      setPeriodDialogOpen(false);
+    }
+  };
+
+  const handleSwitchPeriod = (periodId: string) => {
+    onSwitchPeriod(periodId);
+    // Reset pagination when switching periods
+    setTxPage(1);
+  };
+
+  const handleDeletePeriod = (periodId: string) => {
+    if (window.confirm("Are you sure you want to delete this period? This action cannot be undone.")) {
+      onDeletePeriod(periodId);
+    }
+  };
 
   const sortedTransactions = [...transactions].sort((a, b) => {
     const direction = txSortOrder === "asc" ? 1 : -1;
@@ -132,13 +202,13 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
     }
 
     if (editingCardId) {
-      setCards((prev) =>
-        prev.map((card) =>
-          card.id === editingCardId
-            ? { ...card, name: trimmedName, limit: amount, color: cardColor }
-            : card
-        )
+      const updatedCards = cards.map((card) =>
+        card.id === editingCardId
+          ? { ...card, name: trimmedName, limit: amount, color: cardColor }
+          : card
       );
+      setCards(updatedCards);
+      updateCurrentPeriodData({ cards: updatedCards });
       setEditingCardId("");
     } else {
       const newCard: CreditCard = {
@@ -147,8 +217,11 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
         limit: amount,
         color: cardColor,
       };
-      setCards((prev) => [newCard, ...prev]);
-      setVisibleCardIds((prev) => ({ ...prev, [newCard.id]: true }));
+      const updatedCards = [newCard, ...cards];
+      setCards(updatedCards);
+      const updatedVisibleCardIds = { ...visibleCardIds, [newCard.id]: true };
+      setVisibleCardIds(updatedVisibleCardIds);
+      updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
     }
 
     resetCardForm();
@@ -156,12 +229,18 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
   };
 
   const deleteCard = (cardId: string) => {
-    setCards((prev) => prev.filter((card) => card.id !== cardId));
-    setTransactions((prev) => prev.filter((tx) => tx.cardId !== cardId));
-    setVisibleCardIds((prev) => {
-      const next = { ...prev };
-      delete next[cardId];
-      return next;
+    const updatedCards = cards.filter((card) => card.id !== cardId);
+    const updatedTransactions = transactions.filter((tx) => tx.cardId !== cardId);
+    const updatedVisibleCardIds = { ...visibleCardIds };
+    delete updatedVisibleCardIds[cardId];
+    
+    setCards(updatedCards);
+    setTransactions(updatedTransactions);
+    setVisibleCardIds(updatedVisibleCardIds);
+    updateCurrentPeriodData({ 
+      cards: updatedCards, 
+      transactions: updatedTransactions, 
+      visibleCardIds: updatedVisibleCardIds 
     });
   };
 
@@ -177,7 +256,8 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
     event.preventDefault();
     const amount = Number(bankAmount);
     if (!Number.isNaN(amount)) {
-      setBankTotal(prev => prev + amount);
+      const newBankTotal = bankTotal + amount;
+      setBankTotal(newBankTotal);
       
       // Add bank deposit transaction to the transactions list
       const newBankTransaction: Transaction = {
@@ -188,7 +268,10 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
         description: bankDescription || "Bank deposit",
         createdAt: new Date().toISOString(),
       };
-      setTransactions((prev) => [newBankTransaction, ...prev]);
+      const updatedTransactions = [newBankTransaction, ...transactions];
+      setTransactions(updatedTransactions);
+      
+      updateCurrentPeriodData({ bankTotal: newBankTotal, transactions: updatedTransactions });
       
       setBankAmount("");
       setBankDescription("");
@@ -207,43 +290,44 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
     const card = cards.find((card) => card.id === txCardId);
     const cardNameForTx = txMethod === "debit" ? "Debit" : txMethod === "bank" ? "Bank Deposit" : card?.name || "Unknown card";
 
+    let updatedTransactions: Transaction[];
+    let newBankTotal = bankTotal;
+
     if (editingTxId) {
       // Find the existing transaction to calculate balance changes
       const existingTx = transactions.find(tx => tx.id === editingTxId);
       
-      setTransactions((prev) =>
-        prev.map((tx) =>
-          tx.id === editingTxId
-            ? {
-                ...tx,
-                amount,
-                method: txMethod,
-                cardId: txMethod === "card" ? txCardId : undefined,
-                cardName: cardNameForTx,
-                description: txDescription,
-              }
-            : tx
-        )
+      updatedTransactions = transactions.map((tx) =>
+        tx.id === editingTxId
+          ? {
+              ...tx,
+              amount,
+              method: txMethod,
+              cardId: txMethod === "card" ? txCardId : undefined,
+              cardName: cardNameForTx,
+              description: txDescription,
+            }
+          : tx
       );
 
       // Update bank balance based on transaction changes
       if (existingTx) {
         // Reverse the effect of the old transaction
         if (existingTx.method === "bank") {
-          setBankTotal(prev => prev - existingTx.amount);
+          newBankTotal -= existingTx.amount;
         } else if (existingTx.method === "debit") {
-          setBankTotal(prev => prev + existingTx.amount);
+          newBankTotal += existingTx.amount;
         } else if (existingTx.method === "card") {
-          setBankTotal(prev => prev + existingTx.amount);
+          newBankTotal += existingTx.amount;
         }
 
         // Apply the effect of the new transaction
         if (txMethod === "bank") {
-          setBankTotal(prev => prev + amount);
+          newBankTotal += amount;
         } else if (txMethod === "debit") {
-          setBankTotal(prev => prev - amount);
+          newBankTotal -= amount;
         } else if (txMethod === "card") {
-          setBankTotal(prev => prev - amount);
+          newBankTotal -= amount;
         }
       }
 
@@ -258,17 +342,21 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
         description: txDescription,
         createdAt: new Date().toISOString(),
       };
-      setTransactions((prev) => [newTransaction, ...prev]);
+      updatedTransactions = [newTransaction, ...transactions];
 
       // Update bank balance for new transactions
       if (txMethod === "debit") {
-        setBankTotal(prev => prev - amount);
+        newBankTotal -= amount;
       } else if (txMethod === "card") {
-        setBankTotal(prev => prev - amount);
+        newBankTotal -= amount;
       } else if (txMethod === "bank") {
-        setBankTotal(prev => prev + amount);
+        newBankTotal += amount;
       }
     }
+
+    setTransactions(updatedTransactions);
+    setBankTotal(newBankTotal);
+    updateCurrentPeriodData({ transactions: updatedTransactions, bankTotal: newBankTotal });
 
     setTxAmount("");
     setTxDescription("");
@@ -279,18 +367,22 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
 
   const deleteTransaction = (txId: string) => {
     const txToDelete = transactions.find(tx => tx.id === txId);
-    setTransactions((prev) => prev.filter((tx) => tx.id !== txId));
+    const updatedTransactions = transactions.filter((tx) => tx.id !== txId);
+    setTransactions(updatedTransactions);
 
     // Update bank balance when deleting transactions
+    let newBankTotal = bankTotal;
     if (txToDelete) {
       if (txToDelete.method === "bank") {
-        setBankTotal(prev => prev - txToDelete.amount);
+        newBankTotal -= txToDelete.amount;
       } else if (txToDelete.method === "debit") {
-        setBankTotal(prev => prev + txToDelete.amount);
+        newBankTotal += txToDelete.amount;
       } else if (txToDelete.method === "card") {
-        setBankTotal(prev => prev + txToDelete.amount);
+        newBankTotal += txToDelete.amount;
       }
     }
+    setBankTotal(newBankTotal);
+    updateCurrentPeriodData({ transactions: updatedTransactions, bankTotal: newBankTotal });
   };
 
   const startEditTransaction = (tx: Transaction) => {
@@ -312,9 +404,97 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-300">
               Add credit cards and record transactions (card or debit).
             </p>
+            {currentPeriod && (
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Current Period: <span className="font-medium">{currentPeriod.name}</span>
+                <span className="ml-2 text-xs">({new Date(currentPeriod.createdAt).toLocaleDateString()})</span>
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Period Management */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  Periods {periods.length > 0 && `(${periods.length})`}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {periods.length === 0 ? (
+                  <div className="px-2 py-1 text-xs text-zinc-500">No periods yet</div>
+                ) : (
+                  <>
+                    {periods
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((period) => (
+                        <DropdownMenuItem
+                          key={period.id}
+                          onClick={() => handleSwitchPeriod(period.id)}
+                          className={period.id === currentPeriod?.id ? "bg-zinc-100 dark:bg-zinc-800" : ""}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="truncate">{period.name}</span>
+                            {period.id === currentPeriod?.id && (
+                              <span className="text-xs text-zinc-500 ml-2">current</span>
+                            )}
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setPeriodDialogOpen(true)}>
+                      Create New Period
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {currentPeriod && periods.length > 1 && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => handleDeletePeriod(currentPeriod.id)}
+              >
+                Delete Period
+              </Button>
+            )}
+
+            <Dialog
+              open={periodDialogOpen}
+              onOpenChange={setPeriodDialogOpen}
+            >
+              <DialogTrigger asChild>
+                <Button variant="secondary">New Period</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Period</DialogTitle>
+                  <DialogDescription>Enter a name for the new financial period.</DialogDescription>
+                </DialogHeader>
+                <form className="mt-4 space-y-4" onSubmit={handleCreatePeriod}>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="newPeriodName">
+                      Period name
+                    </label>
+                    <input
+                      id="newPeriodName"
+                      value={newPeriodName}
+                      onChange={(e) => setNewPeriodName(e.target.value)}
+                      className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      placeholder="e.g. January 2024, Q1 2024"
+                      required
+                    />
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit">Create Period</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
             <Dialog
               open={cardDialogOpen}
               onOpenChange={(open) => {
@@ -496,78 +676,19 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          <aside className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Bank Account</h2>
-            </div>
-            <div
-              className="mb-4 rounded-lg border  bg-white p-3 dark:bg-zinc-700"
-              style={{
-                borderColor: bankTotal < 0 ? "#ef4444" : "#d4d4d8",
-                borderWidth: bankTotal < 0 ? "2px" : "1px",
-              }}
-            >
-              <p className="text-sm text-zinc-600 dark:text-zinc-300">Total Balance</p>
-              <p className={`text-2xl font-bold ${ bankTotal < 0 ? "text-red-500" : "text-zinc-900 dark:text-zinc-100"}`}>${bankTotal.toFixed(2)}</p>
-            </div>
-
-            <div className="mb-4 rounded-lg border border-zinc-300 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-700">
-              <p className="text-sm text-zinc-600 dark:text-zinc-300">Total Expenses</p>
-              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                ${transactions
-                  .filter((tx) => tx.method === "debit" || tx.method === "card")
-                  .reduce((sum, tx) => sum + tx.amount, 0)
-                  .toFixed(2)}
-              </p>
-            </div>
-
-            <h2 className="mb-3 text-lg font-semibold text-zinc-800 dark:text-zinc-100">Cards</h2>
-            {cards.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">No cards yet. Add one from the top-left button.</p>
-            ) : (
-              <div className="max-h-[32vh] overflow-y-auto space-y-3">
-                {cards.map((card) => {
-                  const charged = transactions
-                    .filter((tx) => tx.method === "card" && tx.cardId === card.id)
-                    .reduce((sum, tx) => sum + tx.amount, 0);
-
-                  return (
-                    <div key={card.id} className="rounded-lg border border-zinc-300 p-3" style={{ backgroundColor: card.color, color: "white" }}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="text-base font-semibold">{card.name}</h3>
-                          <p className="text-sm opacity-95">Limit: ${card.limit.toLocaleString()}</p>
-                          <p className="text-sm opacity-90">Spent: ${charged.toFixed(2)}</p>
-                          <p className="text-sm opacity-90">Utilization: {(card.limit > 0 ? Math.min(100, (charged / card.limit) * 100).toFixed(1) : "0")}%</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => startEditCard(card)}
-                            className="rounded bg-white px-2 py-1 text-xs font-medium text-zinc-900"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteCard(card.id)}
-                            disabled={transactions.some((tx) => tx.cardId === card.id)}
-                            className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={transactions.some((tx) => tx.cardId === card.id) ? "Cannot delete card with existing transactions" : ""}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </aside>
-
-          <section className="lg:col-span-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 max-h-[64vh] overflow-y-auto">
+        {!currentPeriod ? (
+          <div className="mt-8 text-center py-12">
+            <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100 mb-2">Welcome to Finance Manager</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 mb-6">
+              Create your first financial period to start tracking transactions.
+            </p>
+            <Button onClick={() => setPeriodDialogOpen(true)} size="lg">
+              Create Your First Period
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
+          <section className="lg:col-span-2 lg:order-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 max-h-[64vh] overflow-y-auto">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Transactions</h2>
@@ -731,7 +852,78 @@ export function TransactionManager({ onLogout }: TransactionManagerProps) {
               </>
             )}
           </section>
+
+          <aside className="lg:order-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Bank Account</h2>
+            </div>
+            <div
+              className="mb-4 rounded-lg border  bg-white p-3 dark:bg-zinc-700"
+              style={{
+                borderColor: bankTotal < 0 ? "#ef4444" : "#d4d4d8",
+                borderWidth: bankTotal < 0 ? "2px" : "1px",
+              }}
+            >
+              <p className="text-sm text-zinc-600 dark:text-zinc-300">Total Balance</p>
+              <p className={`text-2xl font-bold ${ bankTotal < 0 ? "text-red-500" : "text-zinc-900 dark:text-zinc-100"}`}>${bankTotal.toFixed(2)}</p>
+            </div>
+
+            <div className="mb-4 rounded-lg border border-zinc-300 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-700">
+              <p className="text-sm text-zinc-600 dark:text-zinc-300">Total Expenses</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                ${transactions
+                  .filter((tx) => tx.method === "debit" || tx.method === "card")
+                  .reduce((sum, tx) => sum + tx.amount, 0)
+                  .toFixed(2)}
+              </p>
+            </div>
+
+            <h2 className="mb-3 text-lg font-semibold text-zinc-800 dark:text-zinc-100">Cards</h2>
+            {cards.length === 0 ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">No cards yet. Add one from the top-left button.</p>
+            ) : (
+              <div className="max-h-[32vh] overflow-y-auto space-y-3">
+                {cards.map((card) => {
+                  const charged = transactions
+                    .filter((tx) => tx.method === "card" && tx.cardId === card.id)
+                    .reduce((sum, tx) => sum + tx.amount, 0);
+
+                  return (
+                    <div key={card.id} className="rounded-lg border border-zinc-300 p-3" style={{ backgroundColor: card.color, color: "white" }}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-base font-semibold">{card.name}</h3>
+                          <p className="text-sm opacity-95">Limit: ${card.limit.toLocaleString()}</p>
+                          <p className="text-sm opacity-90">Spent: ${charged.toFixed(2)}</p>
+                          <p className="text-sm opacity-90">Utilization: {(card.limit > 0 ? Math.min(100, (charged / card.limit) * 100).toFixed(1) : "0")}%</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditCard(card)}
+                            className="rounded bg-white px-2 py-1 text-xs font-medium text-zinc-900"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteCard(card.id)}
+                            disabled={transactions.some((tx) => tx.cardId === card.id)}
+                            className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={transactions.some((tx) => tx.cardId === card.id) ? "Cannot delete card with existing transactions" : ""}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </aside>
         </div>
+        )}
       </div>
     </div>
   );
