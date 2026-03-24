@@ -29,6 +29,13 @@ import {
   PaginationPrevious,
   PaginationNext,
 } from "@/components/ui/pagination";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
 
 type CreditCard = {
   id: string;
@@ -82,10 +89,6 @@ export function TransactionManager({
   const [cardColor, setCardColor] = useState("#0ea5e9");
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string>("");
-
-  const [bankAmount, setBankAmount] = useState("");
-  const [bankDescription, setBankDescription] = useState("");
-  const [bankDialogOpen, setBankDialogOpen] = useState(false);
 
   const [transactions, setTransactions] = useState<Transaction[]>(currentPeriod?.transactions || []);
   const [txAmount, setTxAmount] = useState("");
@@ -290,33 +293,6 @@ export function TransactionManager({
     setCardDialogOpen(true);
   };
 
-  const updateBankTotal = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const amount = Number(bankAmount);
-    if (!Number.isNaN(amount)) {
-      const newBankTotal = bankTotal + amount;
-      setBankTotal(newBankTotal);
-      
-      // Add bank deposit transaction to the transactions list
-      const newBankTransaction: Transaction = {
-        id: crypto.randomUUID(),
-        amount,
-        method: "bank",
-        cardName: "Bank Deposit",
-        description: bankDescription || "Bank deposit",
-        createdAt: new Date().toISOString(),
-      };
-      const updatedTransactions = [newBankTransaction, ...transactions];
-      setTransactions(updatedTransactions);
-      
-      updateCurrentPeriodData({ bankTotal: newBankTotal, transactions: updatedTransactions });
-      
-      setBankAmount("");
-      setBankDescription("");
-      setBankDialogOpen(false);
-    }
-  };
-
   const addTransaction = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -503,7 +479,13 @@ export function TransactionManager({
               }}
             >
               <DialogTrigger asChild>
-                <Button variant="secondary">{editingCardId ? "Edit Card" : "Add Card"}</Button>
+                <Button
+                  variant="secondary"
+                  disabled={!currentPeriod}
+                  title={!currentPeriod ? "Create a period first" : undefined}
+                >
+                  {editingCardId ? "Edit Card" : "Add Card"}
+                </Button>
               </DialogTrigger>
 
               <DialogContent>
@@ -574,13 +556,17 @@ export function TransactionManager({
                   setTxDescription("");
                   setTxMethod("debit");
                   setTxCardId("");
-                  setBankAmount("");
-                  setBankDescription("");
                 }
               }}
             >
               <DialogTrigger asChild>
-                <Button variant="secondary">{editingTxId ? "Edit Transaction" : "Add Transaction"}</Button>
+                <Button
+                  variant="secondary"
+                  disabled={!currentPeriod}
+                  title={!currentPeriod ? "Create a period first" : undefined}
+                >
+                  {editingTxId ? "Edit Transaction" : "Add Transaction"}
+                </Button>
               </DialogTrigger>
 
               <DialogContent>
@@ -677,15 +663,21 @@ export function TransactionManager({
         </div>
 
         {!currentPeriod ? (
-          <div className="mt-8 text-center py-12">
-            <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100 mb-2">Welcome to Finance Manager</h2>
-            <p className="text-zinc-500 dark:text-zinc-400 mb-6">
-              Create your first financial period to start tracking transactions.
-            </p>
-            <Button onClick={() => setPeriodDialogOpen(true)} size="lg">
-              Create Your First Period
-            </Button>
-          </div>
+          <Empty className="mt-8 border border-dashed border-zinc-300 bg-zinc-50 py-12 dark:border-zinc-700 dark:bg-zinc-900/40">
+            <EmptyHeader>
+              <EmptyTitle className="text-xl font-semibold text-zinc-800 dark:text-zinc-100">
+                Welcome to Finance Manager
+              </EmptyTitle>
+              <EmptyDescription className="text-zinc-500 dark:text-zinc-400">
+                Create your first financial period to start tracking transactions.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={() => setPeriodDialogOpen(true)} size="lg">
+                Create Your First Period
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : (
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <section className="lg:order-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 h-[72vh] overflow-y-auto">
@@ -862,11 +854,18 @@ export function TransactionManager({
             </div>
 
             {totalTx === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {txSearch.trim()
-                  ? `No transactions match "${txSearch.trim()}". Try another search.`
-                  : "No transactions yet. Click Add Transaction to begin."}
-              </p>
+              <Empty className="border border-dashed border-zinc-300 bg-zinc-50 py-10 dark:border-zinc-700 dark:bg-zinc-900/40">
+                <EmptyHeader>
+                  <EmptyTitle className="text-zinc-800 dark:text-zinc-100">
+                    {txSearch.trim() ? "No Matching Transactions" : "No Transactions Yet"}
+                  </EmptyTitle>
+                  <EmptyDescription className="text-zinc-500 dark:text-zinc-400">
+                    {txSearch.trim()
+                      ? `No transactions match "${txSearch.trim()}". Try another search.`
+                      : "Click Add Transaction to begin."}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <>
                 <ul className="space-y-3">
@@ -947,7 +946,14 @@ export function TransactionManager({
 
             <h2 className="mb-3 text-lg font-semibold text-zinc-800 dark:text-zinc-100">Cards</h2>
             {cards.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">No cards yet. Add one from the top-left button.</p>
+              <Empty className="border border-dashed border-zinc-300 bg-zinc-50 py-10 dark:border-zinc-700 dark:bg-zinc-900/40">
+                <EmptyHeader>
+                  <EmptyTitle className="text-zinc-800 dark:text-zinc-100">No Cards Yet</EmptyTitle>
+                  <EmptyDescription className="text-zinc-500 dark:text-zinc-400">
+                    Click Add Card to begin.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
                 {cards.map((card) => {
