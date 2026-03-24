@@ -211,7 +211,12 @@ export function TransactionManager({
   const totalPages = Math.max(1, Math.ceil(totalTx / txPageSize));
   const effectiveTxPage = Math.min(txPage, totalPages);
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const visiblePageStart = Math.max(1, Math.min(effectiveTxPage - 1, totalPages - 2));
+  const visiblePageEnd = Math.min(totalPages, visiblePageStart + 2);
+  const visiblePageNumbers = Array.from(
+    { length: visiblePageEnd - visiblePageStart + 1 },
+    (_, i) => visiblePageStart + i
+  );
 
   const pageStartIndex = (effectiveTxPage - 1) * txPageSize;
   const pageEndIndex = Math.min(totalTx, pageStartIndex + txPageSize);
@@ -781,16 +786,55 @@ export function TransactionManager({
                   <option value="asc">Asc</option>
                 </select>
 
+                <div className="sm:hidden">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          aria-disabled={effectiveTxPage <= 1}
+                          className={effectiveTxPage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            if (effectiveTxPage <= 1) return;
+                            setTxPage((prev) => Math.max(1, prev - 1));
+                          }}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span className="px-2 text-sm text-zinc-600 dark:text-zinc-300">
+                          {effectiveTxPage} / {totalPages}
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext
+                          aria-disabled={effectiveTxPage >= totalPages}
+                          className={effectiveTxPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            if (effectiveTxPage >= totalPages) return;
+                            setTxPage((prev) => Math.min(totalPages, prev + 1));
+                          }}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+
                 <div className="hidden sm:block">
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious
-                          disabled={effectiveTxPage <= 1}
-                          onClick={() => setTxPage((prev) => Math.max(1, prev - 1))}
+                          aria-disabled={effectiveTxPage <= 1}
+                          className={effectiveTxPage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            if (effectiveTxPage <= 1) return;
+                            setTxPage((prev) => Math.max(1, prev - 1));
+                          }}
                         />
                       </PaginationItem>
-                      {pageNumbers.map((page) => (
+                      {visiblePageNumbers.map((page) => (
                         <PaginationItem key={page}>
                           <PaginationLink
                             isActive={page === effectiveTxPage}
@@ -802,8 +846,13 @@ export function TransactionManager({
                       ))}
                       <PaginationItem>
                         <PaginationNext
-                          disabled={effectiveTxPage >= totalPages}
-                          onClick={() => setTxPage((prev) => Math.min(totalPages, prev + 1))}
+                          aria-disabled={effectiveTxPage >= totalPages}
+                          className={effectiveTxPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            if (effectiveTxPage >= totalPages) return;
+                            setTxPage((prev) => Math.min(totalPages, prev + 1));
+                          }}
                         />
                       </PaginationItem>
                     </PaginationContent>
