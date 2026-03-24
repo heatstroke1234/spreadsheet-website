@@ -136,9 +136,7 @@ export function TransactionManager({
   };
 
   const handleDeletePeriod = (periodId: string) => {
-    if (window.confirm("Are you sure you want to delete this period? This action cannot be undone.")) {
-      onDeletePeriod(periodId);
-    }
+    onDeletePeriod(periodId);
   };
 
   const sortedTransactions = [...transactions].sort((a, b) => {
@@ -445,56 +443,18 @@ export function TransactionManager({
                     <DropdownMenuItem onClick={() => setPeriodDialogOpen(true)}>
                       Create New Period
                     </DropdownMenuItem>
+                    {currentPeriod && periods.length > 1 && (
+                      <DropdownMenuItem 
+                        onClick={() => handleDeletePeriod(currentPeriod.id)}
+                        className="text-red-600 dark:text-red-400"
+                      >
+                        Delete Current Period
+                      </DropdownMenuItem>
+                    )}
                   </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {currentPeriod && periods.length > 1 && (
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => handleDeletePeriod(currentPeriod.id)}
-              >
-                Delete Period
-              </Button>
-            )}
-
-            <Dialog
-              open={periodDialogOpen}
-              onOpenChange={setPeriodDialogOpen}
-            >
-              <DialogTrigger asChild>
-                <Button variant="secondary">New Period</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Period</DialogTitle>
-                  <DialogDescription>Enter a name for the new financial period.</DialogDescription>
-                </DialogHeader>
-                <form className="mt-4 space-y-4" onSubmit={handleCreatePeriod}>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="newPeriodName">
-                      Period name
-                    </label>
-                    <input
-                      id="newPeriodName"
-                      value={newPeriodName}
-                      onChange={(e) => setNewPeriodName(e.target.value)}
-                      className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                      placeholder="e.g. January 2024, Q1 2024"
-                      required
-                    />
-                  </div>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button variant="outline">Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit">Create Period</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
             <Dialog
               open={cardDialogOpen}
               onOpenChange={(open) => {
@@ -925,6 +885,40 @@ export function TransactionManager({
         </div>
         )}
       </div>
+
+      {/* Period Creation Dialog - available even when no periods exist */}
+      <Dialog
+        open={periodDialogOpen}
+        onOpenChange={setPeriodDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Period</DialogTitle>
+            <DialogDescription>Enter a name for the new financial period.</DialogDescription>
+          </DialogHeader>
+          <form className="mt-4 space-y-4" onSubmit={handleCreatePeriod}>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="newPeriodName">
+                Period name
+              </label>
+              <input
+                id="newPeriodName"
+                value={newPeriodName}
+                onChange={(e) => setNewPeriodName(e.target.value)}
+                className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                placeholder="e.g. January 2024, Q1 2024"
+                required
+              />
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button type="submit">Create Period</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
