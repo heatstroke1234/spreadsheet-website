@@ -21,6 +21,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
 
 type CreditCard = {
   id: string;
@@ -96,11 +104,16 @@ export function TransactionManager({
   const [txPage, setTxPage] = useState(1);
   const [txSortBy, setTxSortBy] = useState<"date" | "amount" | "method">("date");
   const [txSortOrder, setTxSortOrder] = useState<"asc" | "desc">("desc");
-  const txPageSize = 5;
+  const [txSearch, setTxSearch] = useState("");
+  const txPageSize = 4;
 
   // Period management state
   const [newPeriodName, setNewPeriodName] = useState("");
   const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
+
+  // Card deletion confirmation state
+  const [cardDeleteDialogOpen, setCardDeleteDialogOpen] = useState(false);
+  const [cardToDelete, setCardToDelete] = useState<CreditCard | null>(null);
 
   // Update local state when currentPeriod changes
   React.useEffect(() => {
@@ -166,17 +179,39 @@ export function TransactionManager({
   });
 
   const filteredTransactions = sortedTransactions.filter((tx) => {
-    if (tx.method === "debit") return showDebit;
+    if (tx.method === "debit" && !showDebit) return false;
     if (tx.method === "card") {
-      return tx.cardId ? visibleCardIds[tx.cardId] ?? true : true;
+      if (!(tx.cardId ? visibleCardIds[tx.cardId] ?? true : true)) {
+        return false;
+      }
     }
-    if (tx.method === "bank") return showBank;
-    return false;
+    if (tx.method === "bank" && !showBank) return false;
+
+    if (!txSearch.trim()) {
+      return true;
+    }
+
+    const query = txSearch.trim().toLowerCase();
+    const description = tx.description.toLowerCase();
+    const cardName = tx.cardName.toLowerCase();
+    const method = tx.method.toLowerCase();
+    const amount = tx.amount.toString();
+    const date = new Date(tx.createdAt).toLocaleDateString().toLowerCase();
+
+    return (
+      description.includes(query) ||
+      cardName.includes(query) ||
+      method.includes(query) ||
+      amount.includes(query) ||
+      date.includes(query)
+    );
   });
 
   const totalTx = filteredTransactions.length;
   const totalPages = Math.max(1, Math.ceil(totalTx / txPageSize));
   const effectiveTxPage = Math.min(txPage, totalPages);
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   const pageStartIndex = (effectiveTxPage - 1) * txPageSize;
   const pageEndIndex = Math.min(totalTx, pageStartIndex + txPageSize);
@@ -647,14 +682,26 @@ export function TransactionManager({
             </Button>
           </div>
         ) : (
-          <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          <section className="lg:col-span-2 lg:order-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 max-h-[64vh] overflow-y-auto">
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <section className="lg:order-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 h-[72vh] overflow-y-auto">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Transactions</h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   Showing {totalTx === 0 ? 0 : pageStartIndex + 1}–{pageEndIndex} of {totalTx}
                 </p>
+              </div>
+              <div className="w-full md:w-auto">
+                <input
+                  id="txSearch"
+                  value={txSearch}
+                  onChange={(e) => {
+                    setTxSearch(e.target.value);
+                    setTxPage(1);
+                  }}
+                  placeholder="Search transactions"
+                  className="w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                />
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1">
@@ -733,11 +780,44 @@ export function TransactionManager({
                   <option value="desc">Desc</option>
                   <option value="asc">Asc</option>
                 </select>
+
+                <div className="hidden sm:block">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          disabled={effectiveTxPage <= 1}
+                          onClick={() => setTxPage((prev) => Math.max(1, prev - 1))}
+                        />
+                      </PaginationItem>
+                      {pageNumbers.map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            isActive={page === effectiveTxPage}
+                            onClick={() => setTxPage(page)}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          disabled={effectiveTxPage >= totalPages}
+                          onClick={() => setTxPage((prev) => Math.min(totalPages, prev + 1))}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
               </div>
             </div>
 
             {totalTx === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">No transactions yet. Click Add Transaction to begin.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {txSearch.trim()
+                  ? `No transactions match "${txSearch.trim()}". Try another search.`
+                  : "No transactions yet. Click Add Transaction to begin."}
+              </p>
             ) : (
               <>
                 <ul className="space-y-3">
@@ -786,34 +866,12 @@ export function TransactionManager({
                 })}
               </ul>
 
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                    Page {effectiveTxPage} of {totalPages}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTxPage((prev) => Math.max(1, prev - 1))}
-                      disabled={effectiveTxPage <= 1}
-                      className="rounded border border-zinc-300 px-3 py-1 text-sm disabled:opacity-50 dark:border-zinc-700"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTxPage((prev) => Math.min(totalPages, prev + 1))}
-                      disabled={effectiveTxPage >= totalPages}
-                      className="rounded border border-zinc-300 px-3 py-1 text-sm disabled:opacity-50 dark:border-zinc-700"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
+
               </>
             )}
           </section>
 
-          <aside className="lg:order-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
+          <aside className="lg:order-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800 h-[72vh] flex flex-col">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Bank Account</h2>
             </div>
@@ -842,7 +900,7 @@ export function TransactionManager({
             {cards.length === 0 ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">No cards yet. Add one from the top-left button.</p>
             ) : (
-              <div className="max-h-[32vh] overflow-y-auto space-y-3">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
                 {cards.map((card) => {
                   const charged = transactions
                     .filter((tx) => tx.method === "card" && tx.cardId === card.id)
@@ -867,7 +925,10 @@ export function TransactionManager({
                           </button>
                           <button
                             type="button"
-                            onClick={() => deleteCard(card.id)}
+                            onClick={() => {
+                              setCardToDelete(card);
+                              setCardDeleteDialogOpen(true);
+                            }}
                             disabled={transactions.some((tx) => tx.cardId === card.id)}
                             className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             title={transactions.some((tx) => tx.cardId === card.id) ? "Cannot delete card with existing transactions" : ""}
@@ -906,7 +967,7 @@ export function TransactionManager({
                 value={newPeriodName}
                 onChange={(e) => setNewPeriodName(e.target.value)}
                 className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                placeholder="e.g. January 2024, Q1 2024"
+                placeholder={`e.g. January ${new Date().getFullYear()}, Q1 ${new Date().getFullYear()}`}
                 required
               />
             </div>
@@ -917,6 +978,38 @@ export function TransactionManager({
               <Button type="submit">Create Period</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Card Delete Confirmation Dialog */}
+      <Dialog
+        open={cardDeleteDialogOpen}
+        onOpenChange={setCardDeleteDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Credit Card</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the credit card &quot;{cardToDelete?.name}&quot;? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (cardToDelete) {
+                  deleteCard(cardToDelete.id);
+                }
+                setCardDeleteDialogOpen(false);
+                setCardToDelete(null);
+              }}
+            >
+              Delete Card
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
