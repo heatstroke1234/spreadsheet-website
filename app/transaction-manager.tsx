@@ -37,6 +37,12 @@ import {
   EmptyContent,
 } from "@/components/ui/empty";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type CreditCard = {
   id: string;
@@ -50,6 +56,8 @@ type Transaction = {
   amount: number;
   method: "debit" | "card" | "bank";
   category?: "necessary" | "recreation";
+  bankCategory?: "transfer" | "salary";
+  savingsAmount?: number;
   cardId?: string;
   cardName: string;
   description: string;
@@ -63,6 +71,7 @@ type Period = {
   cards: CreditCard[];
   transactions: Transaction[];
   bankTotal: number;
+  totalSavings: number;
   visibleCardIds: Record<string, boolean>;
 };
 
@@ -72,7 +81,7 @@ type TransactionManagerProps = {
   currentPeriod?: Period;
   onCreatePeriod: (name: string) => void;
   onSwitchPeriod: (periodId: string) => void;
-  onUpdatePeriodData: (periodId: string, data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'visibleCardIds'>>) => void;
+  onUpdatePeriodData: (periodId: string, data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'totalSavings' | 'visibleCardIds'>>) => void;
   onDeletePeriod: (periodId: string) => void;
 };
 
@@ -97,6 +106,8 @@ export function TransactionManager({
   const [txDescription, setTxDescription] = useState("");
   const [txMethod, setTxMethod] = useState<"debit" | "card" | "bank">("debit");
   const [txCategory, setTxCategory] = useState<"necessary" | "recreation">("necessary");
+  const [txBankCategory, setTxBankCategory] = useState<"transfer" | "salary">("transfer");
+  const [txSavingsPercent, setTxSavingsPercent] = useState("0");
   const [txCardId, setTxCardId] = useState<string>("");
   const [txDialogOpen, setTxDialogOpen] = useState(false);
   const [editingTxId, setEditingTxId] = useState<string>("");
@@ -105,6 +116,7 @@ export function TransactionManager({
   const [showBank, setShowBank] = useState(true);
   const [visibleCardIds, setVisibleCardIds] = useState<Record<string, boolean>>(currentPeriod?.visibleCardIds || {});
   const [bankTotal, setBankTotal] = useState(currentPeriod?.bankTotal || 0);
+  const [totalSavings, setTotalSavings] = useState(currentPeriod?.totalSavings || 0);
   const [cards, setCards] = useState<CreditCard[]>(currentPeriod?.cards || []);
 
   const [txPage, setTxPage] = useState(1);
@@ -121,18 +133,22 @@ export function TransactionManager({
   const [cardDeleteDialogOpen, setCardDeleteDialogOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<CreditCard | null>(null);
 
+  // Bank summary dialog state
+  const [bankSummaryDialogOpen, setBankSummaryDialogOpen] = useState(false);
+
   // Update local state when currentPeriod changes
   React.useEffect(() => {
     if (currentPeriod) {
       setTransactions(currentPeriod.transactions);
       setVisibleCardIds(currentPeriod.visibleCardIds);
       setBankTotal(currentPeriod.bankTotal);
+      setTotalSavings(currentPeriod.totalSavings || 0);
       setCards(currentPeriod.cards);
     }
   }, [currentPeriod]);
 
   // Helper function to update period data
-  const updateCurrentPeriodData = (data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'visibleCardIds'>>) => {
+  const updateCurrentPeriodData = (data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'totalSavings' | 'visibleCardIds'>>) => {
     if (currentPeriod) {
       onUpdatePeriodData(currentPeriod.id, data);
     }
@@ -230,6 +246,31 @@ export function TransactionManager({
   const pageEndIndex = Math.min(totalTx, pageStartIndex + txPageSize);
   const pagedTransactions = filteredTransactions.slice(pageStartIndex, pageEndIndex);
 
+  const totalBankDeposits = transactions
+    .filter((tx) => tx.method === "bank")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const totalDebitTransactions = transactions
+    .filter((tx) => tx.method === "debit")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const totalCardTransactions = transactions
+    .filter((tx) => tx.method === "card")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const totalNecessaryTransactions = transactions
+    .filter((tx) => tx.category === "necessary")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const totalRecreationTransactions = transactions
+    .filter((tx) => tx.category === "recreation")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const summaryRows = [
+    { label: "Total Bank Deposits", value: totalBankDeposits },
+    { label: "Total Savings", value: totalSavings },
+    { label: "Total Debit Transactions", value: totalDebitTransactions },
+    { label: "Total Card Transactions", value: totalCardTransactions },
+    { label: "Total Necessary Transactions", value: totalNecessaryTransactions },
+    { label: "Total Recreation Transactions", value: totalRecreationTransactions },
+  ].filter((item) => item.value > 0);
+
   const resetCardForm = () => {
     setCardName("");
     setCardLimit("");
@@ -309,8 +350,15 @@ export function TransactionManager({
     const card = cards.find((card) => card.id === txCardId);
     const cardNameForTx = txMethod === "debit" ? "Debit" : txMethod === "bank" ? "Bank Deposit" : card?.name || "Unknown card";
 
+    // Compute savings for salary deposits
+    const savingsAmountForTx =
+      txMethod === "bank" && txBankCategory === "salary"
+        ? amount * (Math.max(0, Math.min(100, Number(txSavingsPercent) || 0)) / 100)
+        : 0;
+
     let updatedTransactions: Transaction[];
     let newBankTotal = bankTotal;
+    let newTotalSavings = totalSavings;
 
     if (editingTxId) {
       // Find the existing transaction to calculate balance changes
@@ -323,6 +371,8 @@ export function TransactionManager({
               amount,
               method: txMethod,
               category: txMethod === "bank" ? undefined : txCategory,
+              bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+              savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
               cardId: txMethod === "card" ? txCardId : undefined,
               cardName: cardNameForTx,
               description: txDescription,
@@ -334,7 +384,9 @@ export function TransactionManager({
       if (existingTx) {
         // Reverse the effect of the old transaction
         if (existingTx.method === "bank") {
-          newBankTotal -= existingTx.amount;
+          const oldSavings = existingTx.savingsAmount ?? 0;
+          newBankTotal -= (existingTx.amount - oldSavings);
+          newTotalSavings -= oldSavings;
         } else if (existingTx.method === "debit") {
           newBankTotal += existingTx.amount;
         } else if (existingTx.method === "card") {
@@ -343,7 +395,8 @@ export function TransactionManager({
 
         // Apply the effect of the new transaction
         if (txMethod === "bank") {
-          newBankTotal += amount;
+          newBankTotal += (amount - savingsAmountForTx);
+          newTotalSavings += savingsAmountForTx;
         } else if (txMethod === "debit") {
           newBankTotal -= amount;
         } else if (txMethod === "card") {
@@ -358,6 +411,8 @@ export function TransactionManager({
         amount,
         method: txMethod,
         category: txMethod === "bank" ? undefined : txCategory,
+        bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+        savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
         cardId: txMethod === "card" ? txCardId : undefined,
         cardName: cardNameForTx,
         description: txDescription,
@@ -371,19 +426,23 @@ export function TransactionManager({
       } else if (txMethod === "card") {
         newBankTotal -= amount;
       } else if (txMethod === "bank") {
-        newBankTotal += amount;
+        newBankTotal += (amount - savingsAmountForTx);
+        newTotalSavings += savingsAmountForTx;
       }
     }
 
     setTransactions(updatedTransactions);
     setBankTotal(newBankTotal);
-    updateCurrentPeriodData({ transactions: updatedTransactions, bankTotal: newBankTotal });
+    setTotalSavings(newTotalSavings);
+    updateCurrentPeriodData({ transactions: updatedTransactions, bankTotal: newBankTotal, totalSavings: newTotalSavings });
 
     setTxAmount("");
     setTxDescription("");
     setTxCardId("");
     setTxMethod("debit");
     setTxCategory("necessary");
+    setTxBankCategory("transfer");
+    setTxSavingsPercent("0");
     setTxDialogOpen(false);
   };
 
@@ -394,9 +453,12 @@ export function TransactionManager({
 
     // Update bank balance when deleting transactions
     let newBankTotal = bankTotal;
+    let newTotalSavings = totalSavings;
     if (txToDelete) {
       if (txToDelete.method === "bank") {
-        newBankTotal -= txToDelete.amount;
+        const savings = txToDelete.savingsAmount ?? 0;
+        newBankTotal -= (txToDelete.amount - savings);
+        newTotalSavings -= savings;
       } else if (txToDelete.method === "debit") {
         newBankTotal += txToDelete.amount;
       } else if (txToDelete.method === "card") {
@@ -404,7 +466,8 @@ export function TransactionManager({
       }
     }
     setBankTotal(newBankTotal);
-    updateCurrentPeriodData({ transactions: updatedTransactions, bankTotal: newBankTotal });
+    setTotalSavings(newTotalSavings);
+    updateCurrentPeriodData({ transactions: updatedTransactions, bankTotal: newBankTotal, totalSavings: newTotalSavings });
   };
 
   const startEditTransaction = (tx: Transaction) => {
@@ -414,6 +477,12 @@ export function TransactionManager({
     setTxMethod(tx.method);
     setTxCategory(tx.category ?? "necessary");
     setTxCardId(tx.cardId ?? "");
+    setTxBankCategory(tx.bankCategory ?? "transfer");
+    setTxSavingsPercent(
+      tx.savingsAmount && tx.amount > 0
+        ? String(Math.round((tx.savingsAmount / tx.amount) * 100))
+        : "0"
+    );
     setTxDialogOpen(true);
   };
 
@@ -566,6 +635,8 @@ export function TransactionManager({
                   setTxMethod("debit");
                   setTxCategory("necessary");
                   setTxCardId("");
+                  setTxBankCategory("transfer");
+                  setTxSavingsPercent("0");
                 }
               }}
             >
@@ -634,6 +705,47 @@ export function TransactionManager({
                         <option value="necessary">Necessary</option>
                         <option value="recreation">Recreation</option>
                       </select>
+                    </div>
+                  )}
+
+                  {txMethod === "bank" && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txBankCategory">
+                        Deposit Type
+                      </label>
+                      <select
+                        id="txBankCategory"
+                        value={txBankCategory}
+                        onChange={(e) => setTxBankCategory(e.target.value as "transfer" | "salary")}
+                        className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        <option value="transfer">Transfer</option>
+                        <option value="salary">Salary</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {txMethod === "bank" && txBankCategory === "salary" && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txSavingsPercent">
+                        Savings (%)
+                      </label>
+                      <input
+                        id="txSavingsPercent"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={txSavingsPercent}
+                        onChange={(e) => setTxSavingsPercent(e.target.value)}
+                        className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        placeholder="e.g. 20"
+                      />
+                      {txAmount && Number(txAmount) > 0 && Number(txSavingsPercent) > 0 && (
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Savings: ${(Number(txAmount) * Math.min(100, Number(txSavingsPercent)) / 100).toFixed(2)} · To bank: ${(Number(txAmount) * (1 - Math.min(100, Number(txSavingsPercent)) / 100)).toFixed(2)}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -707,7 +819,7 @@ export function TransactionManager({
           </Empty>
         ) : (
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <section className="lg:order-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 h-[72vh] overflow-y-auto">
+          <section className="lg:order-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 h-[73vh] overflow-y-auto">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Transactions</h2>
@@ -914,7 +1026,7 @@ export function TransactionManager({
                           </p>
                           <div className="mt-1 flex items-center gap-2">
                             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                              {tx.method === "debit" ? "Payment: Debit" : tx.method === "bank" ? "Bank Deposit" : `Payment: Card (${tx.cardName})`}
+                              {tx.method === "debit" ? "Payment: Debit" : tx.method === "bank" ? `Bank Deposit${tx.bankCategory ? ` (${tx.bankCategory === "salary" ? "Salary" : "Transfer"})` : ""}` : `Payment: Card (${tx.cardName})`}
                             </p>
                             {tx.method !== "bank" && tx.category && (
                               <Badge variant={tx.category === "recreation" ? "outline" : "secondary"}>
@@ -922,10 +1034,25 @@ export function TransactionManager({
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-zinc-500 dark:text-zinc-400">{new Date(tx.createdAt).toLocaleString()}</p>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            {new Date(tx.createdAt).toLocaleString()}
+                          </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">${tx.amount.toFixed(2)}</p>
+                          {tx.method === "bank" && tx.savingsAmount && tx.savingsAmount > 0 ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="cursor-default text-lg font-bold text-zinc-900 dark:text-zinc-100">${tx.amount.toFixed(2)}</p>
+                                </TooltipTrigger>
+                                <TooltipContent side="left">
+                                  Savings: ${tx.savingsAmount.toFixed(2)} · To bank: ${(tx.amount - tx.savingsAmount).toFixed(2)}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">${tx.amount.toFixed(2)}</p>
+                          )}
                           <div className="mt-2 flex items-center gap-2">
                             <button
                               type="button"
@@ -954,9 +1081,12 @@ export function TransactionManager({
             )}
           </section>
 
-          <aside className="lg:order-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800 h-[72vh] flex flex-col">
+          <aside className="lg:order-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800 h-[73vh] flex flex-col">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">Bank Account</h2>
+              <Button variant="outline" size="sm" onClick={() => setBankSummaryDialogOpen(true)}>
+                Summary
+              </Button>
             </div>
             <div
               className="mb-4 rounded-lg border  bg-white p-3 dark:bg-zinc-700"
@@ -1068,6 +1198,38 @@ export function TransactionManager({
               <Button type="submit">Create Period</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Summary Dialog */}
+      <Dialog open={bankSummaryDialogOpen} onOpenChange={setBankSummaryDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Transaction Summary</DialogTitle>
+            <DialogDescription>Overview of deposits and spending by category for this period.</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-2">
+            {summaryRows.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
+                No summary values to show yet.
+              </div>
+            ) : (
+              summaryRows.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800"
+                >
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">{item.label}</p>
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">${item.value.toFixed(2)}</p>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Close</Button>
+            </DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

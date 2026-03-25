@@ -32,12 +32,15 @@ type Period = {
     amount: number;
     method: "debit" | "card" | "bank";
     category?: "necessary" | "recreation";
+    bankCategory?: "transfer" | "salary";
+    savingsAmount?: number;
     cardId?: string;
     cardName: string;
     description: string;
     createdAt: string;
   }[];
   bankTotal: number;
+  totalSavings: number;
   visibleCardIds: Record<string, boolean>;
 };
 
@@ -138,6 +141,7 @@ export default function Home() {
       cards: copiedCards,
       transactions: rolloverTransactions,
       bankTotal: initialBankTotal,
+      totalSavings: 0,
       visibleCardIds,
     };
     
@@ -166,7 +170,7 @@ export default function Home() {
     setSwitchDialogOpen(false);
   };
 
-  const updatePeriodData = (periodId: string, data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'visibleCardIds'>>) => {
+  const updatePeriodData = (periodId: string, data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'totalSavings' | 'visibleCardIds'>>) => {
     setPeriods(prev => prev.map(period => 
       period.id === periodId 
         ? { ...period, ...data }
