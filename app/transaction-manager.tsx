@@ -246,6 +246,8 @@ export function TransactionManager({
   const pageEndIndex = Math.min(totalTx, pageStartIndex + txPageSize);
   const pagedTransactions = filteredTransactions.slice(pageStartIndex, pageEndIndex);
 
+  const totalFilteredAmount = filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
   const totalBankDeposits = transactions
     .filter((tx) => tx.method === "bank")
     .reduce((sum, tx) => sum + tx.amount, 0);
@@ -826,6 +828,11 @@ export function TransactionManager({
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   Showing {totalTx === 0 ? 0 : pageStartIndex + 1}–{pageEndIndex} of {totalTx}
                 </p>
+                {txSearch.trim() && (
+                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mt-1">
+                    Total for search: <span className="text-lg font-bold text-zinc-900 dark:text-zinc-100">${totalFilteredAmount.toFixed(2)}</span>
+                  </p>
+                )}
               </div>
               <div className="w-full md:w-auto">
                 <input
