@@ -31,6 +31,7 @@ type Period = {
     id: string;
     amount: number;
     method: "debit" | "card" | "bank";
+    category?: "necessary" | "recreation";
     cardId?: string;
     cardName: string;
     description: string;

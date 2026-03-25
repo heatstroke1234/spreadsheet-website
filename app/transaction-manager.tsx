@@ -36,6 +36,7 @@ import {
   EmptyDescription,
   EmptyContent,
 } from "@/components/ui/empty";
+import { Badge } from "@/components/ui/badge";
 
 type CreditCard = {
   id: string;
@@ -48,6 +49,7 @@ type Transaction = {
   id: string;
   amount: number;
   method: "debit" | "card" | "bank";
+  category?: "necessary" | "recreation";
   cardId?: string;
   cardName: string;
   description: string;
@@ -94,6 +96,7 @@ export function TransactionManager({
   const [txAmount, setTxAmount] = useState("");
   const [txDescription, setTxDescription] = useState("");
   const [txMethod, setTxMethod] = useState<"debit" | "card" | "bank">("debit");
+  const [txCategory, setTxCategory] = useState<"necessary" | "recreation">("necessary");
   const [txCardId, setTxCardId] = useState<string>("");
   const [txDialogOpen, setTxDialogOpen] = useState(false);
   const [editingTxId, setEditingTxId] = useState<string>("");
@@ -198,6 +201,7 @@ export function TransactionManager({
     const description = tx.description.toLowerCase();
     const cardName = tx.cardName.toLowerCase();
     const method = tx.method.toLowerCase();
+    const category = tx.category?.toLowerCase() ?? "";
     const amount = tx.amount.toString();
     const date = new Date(tx.createdAt).toLocaleDateString().toLowerCase();
 
@@ -205,6 +209,7 @@ export function TransactionManager({
       description.includes(query) ||
       cardName.includes(query) ||
       method.includes(query) ||
+      category.includes(query) ||
       amount.includes(query) ||
       date.includes(query)
     );
@@ -317,6 +322,7 @@ export function TransactionManager({
               ...tx,
               amount,
               method: txMethod,
+              category: txMethod === "bank" ? undefined : txCategory,
               cardId: txMethod === "card" ? txCardId : undefined,
               cardName: cardNameForTx,
               description: txDescription,
@@ -351,6 +357,7 @@ export function TransactionManager({
         id: crypto.randomUUID(),
         amount,
         method: txMethod,
+        category: txMethod === "bank" ? undefined : txCategory,
         cardId: txMethod === "card" ? txCardId : undefined,
         cardName: cardNameForTx,
         description: txDescription,
@@ -376,6 +383,7 @@ export function TransactionManager({
     setTxDescription("");
     setTxCardId("");
     setTxMethod("debit");
+    setTxCategory("necessary");
     setTxDialogOpen(false);
   };
 
@@ -404,6 +412,7 @@ export function TransactionManager({
     setTxAmount(String(tx.amount));
     setTxDescription(tx.description);
     setTxMethod(tx.method);
+    setTxCategory(tx.category ?? "necessary");
     setTxCardId(tx.cardId ?? "");
     setTxDialogOpen(true);
   };
@@ -555,6 +564,7 @@ export function TransactionManager({
                   setTxAmount("");
                   setTxDescription("");
                   setTxMethod("debit");
+                  setTxCategory("necessary");
                   setTxCardId("");
                 }
               }}
@@ -609,6 +619,23 @@ export function TransactionManager({
                       <option value="bank">Bank Deposit</option>
                     </select>
                   </div>
+
+                  {txMethod !== "bank" && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txCategory">
+                        Category
+                      </label>
+                      <select
+                        id="txCategory"
+                        value={txCategory}
+                        onChange={(e) => setTxCategory(e.target.value as "necessary" | "recreation")}
+                        className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        <option value="necessary">Necessary</option>
+                        <option value="recreation">Recreation</option>
+                      </select>
+                    </div>
+                  )}
 
                   {txMethod === "card" && (
                     <div className="space-y-1">
@@ -872,6 +899,7 @@ export function TransactionManager({
                 {pagedTransactions.map((tx) => {
                   const txCard = tx.method === "card" ? cards.find((card) => card.id === tx.cardId) : undefined;
                   const txBorderColor = txCard?.color ?? "";
+                  const txCategoryLabel = tx.category === "recreation" ? "Recreation" : "Necessary";
 
                   return (
                     <li
@@ -884,9 +912,16 @@ export function TransactionManager({
                           <p className="font-medium text-zinc-800 dark:text-zinc-100">
                             {tx.description || "Transaction"}
                           </p>
-                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                            {tx.method === "debit" ? "Payment: Debit" : tx.method === "bank" ? "Bank Deposit" : `Payment: Card (${tx.cardName})`}
-                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                              {tx.method === "debit" ? "Payment: Debit" : tx.method === "bank" ? "Bank Deposit" : `Payment: Card (${tx.cardName})`}
+                            </p>
+                            {tx.method !== "bank" && tx.category && (
+                              <Badge variant={tx.category === "recreation" ? "outline" : "secondary"}>
+                                {txCategoryLabel}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-zinc-500 dark:text-zinc-400">{new Date(tx.createdAt).toLocaleString()}</p>
                         </div>
                         <div className="text-right">
