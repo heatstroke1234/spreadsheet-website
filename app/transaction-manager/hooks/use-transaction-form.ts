@@ -1,0 +1,198 @@
+import { FormEvent, useState } from "react";
+import { CreditCard, Period, Transaction } from "../types";
+
+type UpdatePeriodData = (
+  data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
+) => void;
+
+type UseTransactionFormParams = {
+  cards: CreditCard[];
+  transactions: Transaction[];
+  bankTotal: number;
+  totalSavings: number;
+  setTransactions: (transactions: Transaction[]) => void;
+  setBankTotal: (bankTotal: number) => void;
+  setTotalSavings: (totalSavings: number) => void;
+  updateCurrentPeriodData: UpdatePeriodData;
+};
+
+export function useTransactionForm({
+  cards,
+  transactions,
+  bankTotal,
+  totalSavings,
+  setTransactions,
+  setBankTotal,
+  setTotalSavings,
+  updateCurrentPeriodData,
+}: UseTransactionFormParams) {
+  const [txAmount, setTxAmount] = useState("");
+  const [txDescription, setTxDescription] = useState("");
+  const [txMethod, setTxMethod] = useState<"debit" | "card" | "bank">("debit");
+  const [txCategory, setTxCategory] = useState<"necessary" | "recreation">("necessary");
+  const [txBankCategory, setTxBankCategory] = useState<"transfer" | "salary">("transfer");
+  const [txSavingsPercent, setTxSavingsPercent] = useState("0");
+  const [txCardId, setTxCardId] = useState<string>("");
+  const [txDialogOpen, setTxDialogOpen] = useState(false);
+  const [editingTxId, setEditingTxId] = useState<string>("");
+
+  const resetTransactionForm = () => {
+    setEditingTxId("");
+    setTxAmount("");
+    setTxDescription("");
+    setTxMethod("debit");
+    setTxCategory("necessary");
+    setTxCardId("");
+    setTxBankCategory("transfer");
+    setTxSavingsPercent("0");
+  };
+
+  const onTxDialogOpenChange = (open: boolean) => {
+    setTxDialogOpen(open);
+    if (!open) {
+      resetTransactionForm();
+    }
+  };
+
+  const addTransaction = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const amount = Number(txAmount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      return;
+    }
+
+    const card = cards.find((item) => item.id === txCardId);
+    const cardNameForTx =
+      txMethod === "debit" ? "Debit" : txMethod === "bank" ? "Bank Deposit" : card?.name || "Unknown card";
+
+    const savingsAmountForTx =
+      txMethod === "bank" && txBankCategory === "salary"
+        ? amount * (Math.max(0, Math.min(100, Number(txSavingsPercent) || 0)) / 100)
+        : 0;
+
+    let updatedTransactions: Transaction[];
+    let newBankTotal = bankTotal;
+    let newTotalSavings = totalSavings;
+
+    if (editingTxId) {
+      const existingTx = transactions.find((tx) => tx.id === editingTxId);
+
+      updatedTransactions = transactions.map((tx) =>
+        tx.id === editingTxId
+          ? {
+              ...tx,
+              amount,
+              method: txMethod,
+              category: txMethod === "bank" ? undefined : txCategory,
+              bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+              savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
+              cardId: txMethod === "card" ? txCardId : undefined,
+              cardName: cardNameForTx,
+              description: txDescription,
+            }
+          : tx
+      );
+
+      if (existingTx) {
+        if (existingTx.method === "bank") {
+          const oldSavings = existingTx.savingsAmount ?? 0;
+          newBankTotal -= existingTx.amount - oldSavings;
+          newTotalSavings -= oldSavings;
+        } else if (existingTx.method === "debit") {
+          newBankTotal += existingTx.amount;
+        } else if (existingTx.method === "card") {
+          newBankTotal += existingTx.amount;
+        }
+
+        if (txMethod === "bank") {
+          newBankTotal += amount - savingsAmountForTx;
+          newTotalSavings += savingsAmountForTx;
+        } else if (txMethod === "debit") {
+          newBankTotal -= amount;
+        } else if (txMethod === "card") {
+          newBankTotal -= amount;
+        }
+      }
+
+      setEditingTxId("");
+    } else {
+      const newTransaction: Transaction = {
+        id: crypto.randomUUID(),
+        amount,
+        method: txMethod,
+        category: txMethod === "bank" ? undefined : txCategory,
+        bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+        savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
+        cardId: txMethod === "card" ? txCardId : undefined,
+        cardName: cardNameForTx,
+        description: txDescription,
+        createdAt: new Date().toISOString(),
+      };
+      updatedTransactions = [newTransaction, ...transactions];
+
+      if (txMethod === "debit") {
+        newBankTotal -= amount;
+      } else if (txMethod === "card") {
+        newBankTotal -= amount;
+      } else if (txMethod === "bank") {
+        newBankTotal += amount - savingsAmountForTx;
+        newTotalSavings += savingsAmountForTx;
+      }
+    }
+
+    setTransactions(updatedTransactions);
+    setBankTotal(newBankTotal);
+    setTotalSavings(newTotalSavings);
+    updateCurrentPeriodData({
+      transactions: updatedTransactions,
+      bankTotal: newBankTotal,
+      totalSavings: newTotalSavings,
+    });
+
+    setTxAmount("");
+    setTxDescription("");
+    setTxCardId("");
+    setTxMethod("debit");
+    setTxCategory("necessary");
+    setTxBankCategory("transfer");
+    setTxSavingsPercent("0");
+    setTxDialogOpen(false);
+  };
+
+  const startEditTransaction = (tx: Transaction) => {
+    setEditingTxId(tx.id);
+    setTxAmount(String(tx.amount));
+    setTxDescription(tx.description);
+    setTxMethod(tx.method);
+    setTxCategory(tx.category ?? "necessary");
+    setTxCardId(tx.cardId ?? "");
+    setTxBankCategory(tx.bankCategory ?? "transfer");
+    setTxSavingsPercent(
+      tx.savingsAmount && tx.amount > 0 ? String(Math.round((tx.savingsAmount / tx.amount) * 100)) : "0"
+    );
+    setTxDialogOpen(true);
+  };
+
+  return {
+    txAmount,
+    setTxAmount,
+    txDescription,
+    setTxDescription,
+    txMethod,
+    setTxMethod,
+    txCategory,
+    setTxCategory,
+    txBankCategory,
+    setTxBankCategory,
+    txSavingsPercent,
+    setTxSavingsPercent,
+    txCardId,
+    setTxCardId,
+    txDialogOpen,
+    editingTxId,
+    addTransaction,
+    startEditTransaction,
+    onTxDialogOpenChange,
+  };
+}
