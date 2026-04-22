@@ -41,7 +41,7 @@ type Period = {
   visibleCardIds: Record<string, boolean>;
 };
 
-export function PeriodManager({ onLogout }: { onLogout: () => void }) {
+export function PeriodManager() {
   const [periods, setPeriods] = useState<Period[]>(() => {
     if (typeof window === "undefined") return [];
     const stored = window.localStorage.getItem(PERIODS_STORAGE_KEY);
@@ -195,7 +195,6 @@ export function PeriodManager({ onLogout }: { onLogout: () => void }) {
   return (
     <>
       <TransactionManager
-        onLogout={onLogout}
         periods={periods}
         currentPeriod={currentPeriod}
         onCreatePeriod={createNewPeriod}

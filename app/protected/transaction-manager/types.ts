@@ -30,7 +30,6 @@ export type Period = {
 };
 
 export type TransactionManagerProps = {
-  onLogout: () => void;
   periods: Period[];
   currentPeriod?: Period;
   onCreatePeriod: (name: string) => void;

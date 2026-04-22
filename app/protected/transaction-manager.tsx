@@ -30,17 +30,16 @@ import {
   TxSortBy,
   TxSortOrder,
 } from "./transaction-manager/calculations";
-import { CreditCard, TransactionManagerProps } from "./transaction-manager/types";
+import { LogoutButton } from '@/components/logout-button'
 
 export function TransactionManager({ 
-  onLogout, 
   periods, 
   currentPeriod, 
   onCreatePeriod, 
   onSwitchPeriod, 
   onUpdatePeriodData,
   onDeletePeriod 
-}: TransactionManagerProps) {
+}: Omit<TransactionManagerProps, 'onLogout'>) {
   const [showDebit, setShowDebit] = useState(true);
   const [showBank, setShowBank] = useState(true);
 
@@ -269,9 +268,7 @@ export function TransactionManager({
               onTxCardIdChange={setTxCardId}
             />
 
-            <Button onClick={onLogout} variant="destructive">
-              Log out
-            </Button>
+            <LogoutButton />
           </div>
         </div>
 

@@ -1,27 +1,16 @@
-"use client";
+import { redirect } from 'next/navigation'
 
-import { useState } from "react";
-import { Login } from "./login";
-import { PeriodManager } from "./period-manager";
+import { createClient } from '@/lib/supabase/server'
 
-const STORAGE_KEY = "mock-login-authenticated";
+export default async function Home() {
+  const supabase = await createClient()
 
-export default function Home() {
-  const [loggedIn, setLoggedIn] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(STORAGE_KEY) === "true";
-  });
+  const { data } = await supabase.auth.getClaims()
+  const user = data?.claims
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-    setLoggedIn(false);
-  };
-
-  if (!loggedIn) {
-    return <Login onSuccess={() => setLoggedIn(true)} />;
+  if (user) {
+    redirect('/protected')
+  } else {
+    redirect('/auth/login')
   }
-
-  return <PeriodManager onLogout={handleLogout} />;
 }
