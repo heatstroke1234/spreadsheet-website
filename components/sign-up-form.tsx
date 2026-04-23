@@ -31,6 +31,11 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
     setIsLoading(true)
     setError(null)
 
+    // Sign-up is disabled for this application
+    setError('Account creation is currently disabled. Please contact support for access.')
+    setIsLoading(false)
+    return
+
     if (password !== repeatPassword) {
       setError('Passwords do not match')
       setIsLoading(false)
