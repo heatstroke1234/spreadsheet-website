@@ -31,6 +31,49 @@ import {
   TxSortOrder,
 } from "./transaction-manager/calculations";
 import { LogoutButton } from '@/components/logout-button'
+import { Transaction } from "./transaction-manager/types";
+
+function generateCSV(transactions: Transaction[], cards: { id: string; name: string }[]): string {
+  const headers = [
+    "Date",
+    "Description",
+    "Amount",
+    "Method",
+    "Category",
+    "Bank Category",
+    "Savings Amount",
+    "Card Name",
+  ];
+  
+  const rows = transactions.map((tx) => {
+    const card = cards.find((c) => c.id === tx.cardId);
+    return [
+      new Date(tx.createdAt).toISOString(),
+      `"${(tx.description || "").replace(/"/g, '""')}"`,
+      tx.amount.toFixed(2),
+      tx.method,
+      tx.category || "",
+      tx.bankCategory || "",
+      tx.savingsAmount?.toFixed(2) || "",
+      tx.cardName || "",
+    ].join(",");
+  });
+  
+  return [headers.join(","), ...rows].join("\n");
+}
+
+function downloadCSV(transactions: Transaction[], cards: { id: string; name: string }[], periodName: string): void {
+  const csv = generateCSV(transactions, cards);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${periodName.replace(/[^a-z0-9]/gi, "_")}_transactions.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export function TransactionManager({ 
   periods, 
@@ -293,6 +336,7 @@ export function TransactionManager({
             <TransactionsPanel
               cards={cards}
               pagedTransactions={pagedTransactions}
+              filteredTransactions={filteredTransactions}
               totalTx={totalTx}
               pageStartIndex={pageStartIndex}
               pageEndIndex={pageEndIndex}
@@ -320,6 +364,7 @@ export function TransactionManager({
               onSetSortOrder={setTxSortOrder}
               onEditTransaction={startEditTransaction}
               onDeleteTransaction={deleteTransaction}
+              onDownloadCSV={() => downloadCSV(filteredTransactions, cards, currentPeriod?.name || "transactions")}
             />
 
             <BankCardsPanel

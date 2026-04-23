@@ -32,6 +32,7 @@ import { TxSortBy, TxSortOrder } from "../calculations";
 type TransactionsPanelProps = {
   cards: CreditCard[];
   pagedTransactions: Transaction[];
+  filteredTransactions: Transaction[];
   totalTx: number;
   pageStartIndex: number;
   pageEndIndex: number;
@@ -54,11 +55,13 @@ type TransactionsPanelProps = {
   onSetSortOrder: (value: TxSortOrder) => void;
   onEditTransaction: (tx: Transaction) => void;
   onDeleteTransaction: (txId: string) => void;
+  onDownloadCSV: () => void;
 };
 
 export function TransactionsPanel({
   cards,
   pagedTransactions,
+  filteredTransactions,
   totalTx,
   pageStartIndex,
   pageEndIndex,
@@ -81,6 +84,7 @@ export function TransactionsPanel({
   onSetSortOrder,
   onEditTransaction,
   onDeleteTransaction,
+  onDownloadCSV,
 }: TransactionsPanelProps) {
   return (
     <section className="h-[73vh] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 lg:order-2">
@@ -97,7 +101,15 @@ export function TransactionsPanel({
           )}
         </div>
 
-        <div className="w-full md:w-auto">
+        <div className="flex w-full items-center gap-2 md:w-auto">
+          <button
+            type="button"
+            onClick={onDownloadCSV}
+            disabled={filteredTransactions.length === 0}
+            className="shrink-0 rounded border border-zinc-300 bg-zinc-100 px-2 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+          >
+            CSV
+          </button>
           <input
             id="txSearch"
             value={txSearch}
