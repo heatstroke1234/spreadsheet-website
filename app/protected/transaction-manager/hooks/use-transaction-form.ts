@@ -5,6 +5,11 @@ type UpdatePeriodData = (
   data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
 ) => void;
 
+type CreateTransaction = (periodId: string, transaction: Transaction) => Promise<Transaction>;
+type UpdateTransaction = (transactionId: string, transaction: Partial<Transaction>) => Promise<Transaction>;
+type DeleteTransaction = (transactionId: string) => Promise<void>;
+type UpdatePeriodTotals = (periodId: string, totals: { bankTotal?: number; totalSavings?: number }) => Promise<void>;
+
 type UseTransactionFormParams = {
   cards: CreditCard[];
   transactions: Transaction[];
@@ -14,6 +19,11 @@ type UseTransactionFormParams = {
   setBankTotal: (bankTotal: number) => void;
   setTotalSavings: (totalSavings: number) => void;
   updateCurrentPeriodData: UpdatePeriodData;
+  periodId?: string;
+  createTransaction?: CreateTransaction;
+  updateTransaction?: UpdateTransaction;
+  deleteTransaction?: DeleteTransaction;
+  updatePeriodTotals?: UpdatePeriodTotals;
 };
 
 export function useTransactionForm({
@@ -25,6 +35,11 @@ export function useTransactionForm({
   setBankTotal,
   setTotalSavings,
   updateCurrentPeriodData,
+  periodId,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+  updatePeriodTotals,
 }: UseTransactionFormParams) {
   const [txAmount, setTxAmount] = useState("");
   const [txDescription, setTxDescription] = useState("");
@@ -54,7 +69,7 @@ export function useTransactionForm({
     }
   };
 
-  const addTransaction = (event: FormEvent<HTMLFormElement>) => {
+  const addTransaction = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const amount = Number(txAmount);
@@ -78,21 +93,45 @@ export function useTransactionForm({
     if (editingTxId) {
       const existingTx = transactions.find((tx) => tx.id === editingTxId);
 
-      updatedTransactions = transactions.map((tx) =>
-        tx.id === editingTxId
-          ? {
-              ...tx,
-              amount,
-              method: txMethod,
-              category: txMethod === "bank" ? undefined : txCategory,
-              bankCategory: txMethod === "bank" ? txBankCategory : undefined,
-              savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
-              cardId: txMethod === "card" ? txCardId : undefined,
-              cardName: cardNameForTx,
-              description: txDescription,
-            }
-          : tx
-      );
+      const updatedTx: Transaction = {
+        ...existingTx!,
+        amount,
+        method: txMethod,
+        category: txMethod === "bank" ? undefined : txCategory,
+        bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+        savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
+        cardId: txMethod === "card" ? txCardId : undefined,
+        cardName: cardNameForTx,
+        description: txDescription,
+      };
+
+      // Use granular update if available
+      if (updateTransaction) {
+        try {
+          const result = await updateTransaction(editingTxId, {
+            amount,
+            method: txMethod,
+            category: txMethod === "bank" ? undefined : txCategory,
+            bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+            savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
+            cardId: txMethod === "card" ? txCardId : undefined,
+            cardName: cardNameForTx,
+            description: txDescription,
+          });
+          updatedTransactions = transactions.map((tx) =>
+            tx.id === editingTxId ? { ...tx, ...result } : tx
+          );
+        } catch (error) {
+          console.error("Failed to update transaction:", error);
+          updatedTransactions = transactions.map((tx) =>
+            tx.id === editingTxId ? updatedTx : tx
+          );
+        }
+      } else {
+        updatedTransactions = transactions.map((tx) =>
+          tx.id === editingTxId ? updatedTx : tx
+        );
+      }
 
       if (existingTx) {
         if (existingTx.method === "bank") {
@@ -129,7 +168,19 @@ export function useTransactionForm({
         description: txDescription,
         createdAt: new Date().toISOString(),
       };
-      updatedTransactions = [newTransaction, ...transactions];
+
+      // Use granular create if available
+      if (createTransaction && periodId) {
+        try {
+          const created = await createTransaction(periodId, newTransaction);
+          updatedTransactions = [created, ...transactions];
+        } catch (error) {
+          console.error("Failed to create transaction:", error);
+          updatedTransactions = [newTransaction, ...transactions];
+        }
+      } else {
+        updatedTransactions = [newTransaction, ...transactions];
+      }
 
       if (txMethod === "debit") {
         newBankTotal -= amount;
@@ -144,11 +195,26 @@ export function useTransactionForm({
     setTransactions(updatedTransactions);
     setBankTotal(newBankTotal);
     setTotalSavings(newTotalSavings);
-    updateCurrentPeriodData({
-      transactions: updatedTransactions,
-      bankTotal: newBankTotal,
-      totalSavings: newTotalSavings,
-    });
+    
+    // Use granular totals update if available
+    if (updatePeriodTotals && periodId) {
+      try {
+        await updatePeriodTotals(periodId, { bankTotal: newBankTotal, totalSavings: newTotalSavings });
+      } catch (error) {
+        console.error("Failed to update period totals:", error);
+        updateCurrentPeriodData({
+          transactions: updatedTransactions,
+          bankTotal: newBankTotal,
+          totalSavings: newTotalSavings,
+        });
+      }
+    } else {
+      updateCurrentPeriodData({
+        transactions: updatedTransactions,
+        bankTotal: newBankTotal,
+        totalSavings: newTotalSavings,
+      });
+    }
 
     setTxAmount("");
     setTxDescription("");

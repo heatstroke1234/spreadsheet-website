@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TransactionManager } from "./transaction-manager";
+import { createClient } from "@/lib/supabase/client";
+import { createPeriodService } from "./transaction-manager/periodService";
+import type { CreditCard, Transaction } from "./transaction-manager/types";
 import {
   Dialog,
   DialogContent,
@@ -11,8 +14,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-
-const PERIODS_STORAGE_KEY = "finance-periods";
 
 type Period = {
   id: string;
@@ -42,38 +43,12 @@ type Period = {
 };
 
 export function PeriodManager() {
-  const [periods, setPeriods] = useState<Period[]>(() => {
-    if (typeof window === "undefined") return [];
-    const stored = window.localStorage.getItem(PERIODS_STORAGE_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (error) {
-        console.error("Failed to parse stored periods:", error);
-        return [];
-      }
-    }
-    return [];
-  });
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [currentPeriodId, setCurrentPeriodId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [currentPeriodId, setCurrentPeriodId] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    const stored = window.localStorage.getItem(PERIODS_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsedPeriods: Period[] = JSON.parse(stored);
-        if (parsedPeriods.length > 0) {
-          const mostRecent = parsedPeriods.reduce((latest, current) =>
-            new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
-          );
-          return mostRecent.id;
-        }
-      } catch (error) {
-        console.error("Failed to parse stored periods:", error);
-      }
-    }
-    return "";
-  });
+  // Create service lazily once
+  const [periodService] = useState(() => createPeriodService(createClient()));
 
   // Period switching warning dialog state
   const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
@@ -83,16 +58,26 @@ export function PeriodManager() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeletePeriodId, setPendingDeletePeriodId] = useState<string>("");
 
-  // Save periods to localStorage whenever they change
+  // Load periods from Supabase on mount
   useEffect(() => {
-    if (typeof window !== "undefined" && periods.length > 0) {
-      window.localStorage.setItem(PERIODS_STORAGE_KEY, JSON.stringify(periods));
-    }
-  }, [periods]);
+    // Load periods from Supabase
+    periodService.listPeriods().then((loadedPeriods) => {
+      setPeriods(loadedPeriods);
+      if (loadedPeriods.length > 0) {
+        const mostRecent = loadedPeriods.reduce((latest, current) =>
+          new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+        );
+        setCurrentPeriodId(mostRecent.id);
+      }
+      setIsLoading(false);
+    }).catch((error) => {
+      console.error("Failed to load periods:", error);
+      setIsLoading(false);
+    });
+  }, [periodService]);
 
-  const createNewPeriod = (name: string) => {
+  const createNewPeriod = useCallback(async (name: string) => {
     const currentPeriod = periods.find(p => p.id === currentPeriodId);
-
     const copiedCards = currentPeriod ? [...currentPeriod.cards] : [];
 
     const rolloverTransactions: Period['transactions'] = [];
@@ -116,57 +101,92 @@ export function PeriodManager() {
       visibleCardIds[card.id] = true;
     });
 
-    const newPeriod: Period = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      createdAt: new Date().toISOString(),
-      cards: copiedCards,
-      transactions: rolloverTransactions,
-      bankTotal: initialBankTotal,
-      totalSavings: 0,
-      visibleCardIds,
-    };
+    try {
+      const newPeriod = await periodService.onCreatePeriod(name.trim());
+      
+      // If there are copied cards or rollover transactions, update the period data
+      if (copiedCards.length > 0 || rolloverTransactions.length > 0) {
+        const updatedPeriod = await periodService.onUpdatePeriodData(newPeriod.id, {
+          cards: copiedCards,
+          transactions: rolloverTransactions,
+          bankTotal: initialBankTotal,
+          totalSavings: 0,
+          visibleCardIds,
+        });
+        
+        setPeriods(prev => [...prev, updatedPeriod]);
+        setCurrentPeriodId(updatedPeriod.id);
+      } else {
+        setPeriods(prev => [...prev, newPeriod]);
+        setCurrentPeriodId(newPeriod.id);
+      }
+    } catch (error) {
+      console.error("Failed to create period:", error);
+    }
+  }, [periodService, periods, currentPeriodId]);
 
-    setPeriods(prev => [...prev, newPeriod]);
-    setCurrentPeriodId(newPeriod.id);
-  };
-
-  const switchPeriod = (periodId: string) => {
+  const switchPeriod = useCallback(async (periodId: string) => {
     const targetPeriod = periods.find(p => p.id === periodId);
     if (!targetPeriod) return;
 
     setPendingPeriodId(periodId);
     setSwitchDialogOpen(true);
-  };
+  }, [periods]);
 
-  const confirmSwitchPeriod = () => {
-    if (pendingPeriodId) {
-      setCurrentPeriodId(pendingPeriodId);
-      setPendingPeriodId("");
+  const confirmSwitchPeriod = useCallback(async () => {
+    if (!pendingPeriodId) {
       setSwitchDialogOpen(false);
+      return;
     }
-  };
 
-  const cancelSwitchPeriod = () => {
+    try {
+      const period = await periodService.onSwitchPeriod(pendingPeriodId);
+      if (period) {
+        setCurrentPeriodId(pendingPeriodId);
+      }
+    } catch (error) {
+      console.error("Failed to switch period:", error);
+    }
+
     setPendingPeriodId("");
     setSwitchDialogOpen(false);
-  };
+  }, [periodService, pendingPeriodId]);
 
-  const updatePeriodData = (periodId: string, data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'totalSavings' | 'visibleCardIds'>>) => {
-    setPeriods(prev => prev.map(period =>
-      period.id === periodId
-        ? { ...period, ...data }
-        : period
-    ));
-  };
+  const cancelSwitchPeriod = useCallback(() => {
+    setPendingPeriodId("");
+    setSwitchDialogOpen(false);
+  }, []);
 
-  const deletePeriod = (periodId: string) => {
+  const updatePeriodData = useCallback(async (
+    periodId: string, 
+    data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'totalSavings' | 'visibleCardIds'>>
+  ) => {
+    try {
+      const updatedPeriod = await periodService.onUpdatePeriodData(periodId, data);
+      setPeriods(prev => prev.map(period =>
+        period.id === periodId
+          ? updatedPeriod
+          : period
+      ));
+    } catch (error) {
+      console.error("Failed to update period data:", error);
+    }
+  }, [periodService]);
+
+  const deletePeriod = useCallback((periodId: string) => {
     setPendingDeletePeriodId(periodId);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const confirmDeletePeriod = () => {
-    if (pendingDeletePeriodId) {
+  const confirmDeletePeriod = useCallback(async () => {
+    if (!pendingDeletePeriodId) {
+      setDeleteDialogOpen(false);
+      return;
+    }
+
+    try {
+      await periodService.onDeletePeriod(pendingDeletePeriodId);
+      
       setPeriods(prev => prev.filter(p => p.id !== pendingDeletePeriodId));
       if (currentPeriodId === pendingDeletePeriodId) {
         const remaining = periods.filter(p => p.id !== pendingDeletePeriodId);
@@ -179,18 +199,29 @@ export function PeriodManager() {
           setCurrentPeriodId("");
         }
       }
-      setPendingDeletePeriodId("");
-      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to delete period:", error);
     }
-  };
 
-  const cancelDeletePeriod = () => {
     setPendingDeletePeriodId("");
     setDeleteDialogOpen(false);
-  };
+  }, [periodService, pendingDeletePeriodId, periods, currentPeriodId]);
+
+  const cancelDeletePeriod = useCallback(() => {
+    setPendingDeletePeriodId("");
+    setDeleteDialogOpen(false);
+  }, []);
 
   const currentPeriod = periods.find(p => p.id === currentPeriodId);
   const pendingPeriod = periods.find(p => p.id === pendingPeriodId);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-muted-foreground">Loading periods...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -201,6 +232,13 @@ export function PeriodManager() {
         onSwitchPeriod={switchPeriod}
         onUpdatePeriodData={updatePeriodData}
         onDeletePeriod={deletePeriod}
+        createCard={periodService ? ((periodId: string, card: CreditCard) => periodService.createCard(periodId, card)) : undefined}
+        updateCard={periodService ? ((cardId: string, card: Partial<CreditCard>) => periodService.updateCard(cardId, card)) : undefined}
+        deleteCard={periodService ? ((cardId: string) => periodService.deleteCard(cardId)) : undefined}
+        createTransaction={periodService ? ((periodId: string, tx: Transaction) => periodService.createTransaction(periodId, tx)) : undefined}
+        updateTransaction={periodService ? ((txId: string, tx: Partial<Transaction>) => periodService.updateTransaction(txId, tx)) : undefined}
+        deleteTransaction={periodService ? ((txId: string) => periodService.deleteTransaction(txId)) : undefined}
+        updatePeriodTotals={periodService ? ((periodId: string, totals: { bankTotal?: number; totalSavings?: number }) => periodService.updatePeriodTotals(periodId, totals)) : undefined}
       />
 
       <Dialog open={switchDialogOpen} onOpenChange={setSwitchDialogOpen}>

@@ -5,12 +5,20 @@ type UpdatePeriodData = (
   data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
 ) => void;
 
+type CreateCard = (periodId: string, card: CreditCard) => Promise<CreditCard>;
+type UpdateCard = (cardId: string, card: Partial<CreditCard>) => Promise<CreditCard>;
+type DeleteCard = (cardId: string) => Promise<void>;
+
 type UseCardFormParams = {
   cards: CreditCard[];
   visibleCardIds: Record<string, boolean>;
   setCards: (cards: CreditCard[]) => void;
   setVisibleCardIds: (visibleCardIds: Record<string, boolean>) => void;
   updateCurrentPeriodData: UpdatePeriodData;
+  periodId?: string;
+  createCard?: CreateCard;
+  updateCard?: UpdateCard;
+  deleteCard?: DeleteCard;
 };
 
 export function useCardForm({
@@ -19,6 +27,10 @@ export function useCardForm({
   setCards,
   setVisibleCardIds,
   updateCurrentPeriodData,
+  periodId,
+  createCard,
+  updateCard,
+  deleteCard,
 }: UseCardFormParams) {
   const [cardName, setCardName] = useState("");
   const [cardLimit, setCardLimit] = useState("");
@@ -48,7 +60,7 @@ export function useCardForm({
     setCardDialogOpen(true);
   };
 
-  const addCard = (event: FormEvent<HTMLFormElement>) => {
+  const addCard = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedName = cardName.trim();
@@ -59,11 +71,30 @@ export function useCardForm({
     }
 
     if (editingCardId) {
-      const updatedCards = cards.map((card) =>
-        card.id === editingCardId ? { ...card, name: trimmedName, limit: amount, color: cardColor } : card
-      );
-      setCards(updatedCards);
-      updateCurrentPeriodData({ cards: updatedCards });
+      // Use granular update if available
+      if (updateCard) {
+        try {
+          const updated = await updateCard(editingCardId, { name: trimmedName, limit: amount, color: cardColor });
+          const updatedCards = cards.map((card) =>
+            card.id === editingCardId ? { ...card, name: updated.name, limit: updated.limit, color: updated.color } : card
+          );
+          setCards(updatedCards);
+        } catch (error) {
+          console.error("Failed to update card:", error);
+          // Fallback to local state
+          const updatedCards = cards.map((card) =>
+            card.id === editingCardId ? { ...card, name: trimmedName, limit: amount, color: cardColor } : card
+          );
+          setCards(updatedCards);
+          updateCurrentPeriodData({ cards: updatedCards });
+        }
+      } else {
+        const updatedCards = cards.map((card) =>
+          card.id === editingCardId ? { ...card, name: trimmedName, limit: amount, color: cardColor } : card
+        );
+        setCards(updatedCards);
+        updateCurrentPeriodData({ cards: updatedCards });
+      }
       setEditingCardId("");
     } else {
       const newCard: CreditCard = {
@@ -72,11 +103,31 @@ export function useCardForm({
         limit: amount,
         color: cardColor,
       };
-      const updatedCards = [newCard, ...cards];
-      setCards(updatedCards);
-      const updatedVisibleCardIds = { ...visibleCardIds, [newCard.id]: true };
-      setVisibleCardIds(updatedVisibleCardIds);
-      updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
+
+      // Use granular create if available
+      if (createCard && periodId) {
+        try {
+          const created = await createCard(periodId, newCard);
+          const updatedCards = [created, ...cards];
+          setCards(updatedCards);
+          const updatedVisibleCardIds = { ...visibleCardIds, [created.id]: true };
+          setVisibleCardIds(updatedVisibleCardIds);
+        } catch (error) {
+          console.error("Failed to create card:", error);
+          // Fallback to local state
+          const updatedCards = [newCard, ...cards];
+          setCards(updatedCards);
+          const updatedVisibleCardIds = { ...visibleCardIds, [newCard.id]: true };
+          setVisibleCardIds(updatedVisibleCardIds);
+          updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
+        }
+      } else {
+        const updatedCards = [newCard, ...cards];
+        setCards(updatedCards);
+        const updatedVisibleCardIds = { ...visibleCardIds, [newCard.id]: true };
+        setVisibleCardIds(updatedVisibleCardIds);
+        updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
+      }
     }
 
     resetCardForm();

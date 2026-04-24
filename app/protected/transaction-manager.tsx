@@ -21,6 +21,7 @@ import { useCardForm } from "./transaction-manager/hooks/use-card-form";
 import { useTransactionForm } from "./transaction-manager/hooks/use-transaction-form";
 import { usePeriodData } from "./transaction-manager/hooks/use-period-data";
 import { usePeriodManagement } from "./transaction-manager/hooks/use-period-management";
+import { TransactionManagerProps, CreditCard, Transaction } from "./transaction-manager/types";
 import {
   filterTransactions,
   paginateTransactions,
@@ -31,7 +32,6 @@ import {
   TxSortOrder,
 } from "./transaction-manager/calculations";
 import { LogoutButton } from '@/components/logout-button'
-import { Transaction } from "./transaction-manager/types";
 
 function generateCSV(transactions: Transaction[], cards: { id: string; name: string }[]): string {
   const headers = [
@@ -81,7 +81,14 @@ export function TransactionManager({
   onCreatePeriod, 
   onSwitchPeriod, 
   onUpdatePeriodData,
-  onDeletePeriod 
+  onDeletePeriod,
+  createCard,
+  updateCard,
+  deleteCard: deleteCardFn,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction: deleteTransactionFn,
+  updatePeriodTotals,
 }: Omit<TransactionManagerProps, 'onLogout'>) {
   const [showDebit, setShowDebit] = useState(true);
   const [showBank, setShowBank] = useState(true);
@@ -171,9 +178,21 @@ export function TransactionManager({
     setCards,
     setVisibleCardIds,
     updateCurrentPeriodData,
+    periodId: currentPeriod?.id,
+    createCard,
+    updateCard,
   });
 
-  const deleteCard = (cardId: string) => {
+  const deleteCard = async (cardId: string) => {
+    // Use granular delete if available
+    if (deleteCardFn) {
+      try {
+        await deleteCardFn(cardId);
+      } catch (error) {
+        console.error("Failed to delete card:", error);
+      }
+    }
+    
     const updatedCards = cards.filter((card) => card.id !== cardId);
     const updatedTransactions = transactions.filter((tx) => tx.cardId !== cardId);
     const updatedVisibleCardIds = { ...visibleCardIds };
@@ -218,10 +237,24 @@ export function TransactionManager({
     setBankTotal,
     setTotalSavings,
     updateCurrentPeriodData,
+    periodId: currentPeriod?.id,
+    createTransaction,
+    updateTransaction,
+    updatePeriodTotals,
   });
 
-  const deleteTransaction = (txId: string) => {
+  const deleteTransaction = async (txId: string) => {
     const txToDelete = transactions.find(tx => tx.id === txId);
+    
+    // Use granular delete if available
+    if (deleteTransactionFn) {
+      try {
+        await deleteTransactionFn(txId);
+      } catch (error) {
+        console.error("Failed to delete transaction:", error);
+      }
+    }
+    
     const updatedTransactions = transactions.filter((tx) => tx.id !== txId);
     setTransactions(updatedTransactions);
 

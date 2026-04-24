@@ -39,4 +39,12 @@ export type TransactionManagerProps = {
     data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
   ) => void;
   onDeletePeriod: (periodId: string) => void;
+  // Granular operations for efficient DB updates
+  createCard?: (periodId: string, card: CreditCard) => Promise<CreditCard>;
+  updateCard?: (cardId: string, card: Partial<CreditCard>) => Promise<CreditCard>;
+  deleteCard?: (cardId: string) => Promise<void>;
+  createTransaction?: (periodId: string, transaction: Transaction) => Promise<Transaction>;
+  updateTransaction?: (transactionId: string, transaction: Partial<Transaction>) => Promise<Transaction>;
+  deleteTransaction?: (transactionId: string) => Promise<void>;
+  updatePeriodTotals?: (periodId: string, totals: { bankTotal?: number; totalSavings?: number }) => Promise<void>;
 };
