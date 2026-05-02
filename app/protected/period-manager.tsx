@@ -46,9 +46,8 @@ export function PeriodManager() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [currentPeriodId, setCurrentPeriodId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-
-  // Create service lazily once
-  const [periodService] = useState(() => createPeriodService(createClient()));
+  const [userId, setUserId] = useState<string | null>(null);
+  const [periodService, setPeriodService] = useState<ReturnType<typeof createPeriodService> | null>(null);
 
   // Period switching warning dialog state
   const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
@@ -58,25 +57,46 @@ export function PeriodManager() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeletePeriodId, setPendingDeletePeriodId] = useState<string>("");
 
-  // Load periods from Supabase on mount
+  // Load periods from Supabase on mount - get user first, then create service
   useEffect(() => {
-    // Load periods from Supabase
-    periodService.listPeriods().then((loadedPeriods) => {
-      setPeriods(loadedPeriods);
-      if (loadedPeriods.length > 0) {
-        const mostRecent = loadedPeriods.reduce((latest, current) =>
-          new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
-        );
-        setCurrentPeriodId(mostRecent.id);
+    const client = createClient();
+    
+    // Get the authenticated user
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUserId(session.user.id);
+        
+        // Create service with user context
+        const service = createPeriodService(client, session.user.id);
+        setPeriodService(service);
+        
+        // Now load periods with the user ID
+        service.listPeriods().then((loadedPeriods) => {
+          setPeriods(loadedPeriods);
+          if (loadedPeriods.length > 0) {
+            const mostRecent = loadedPeriods.reduce((latest, current) =>
+              new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+            );
+            setCurrentPeriodId(mostRecent.id);
+          }
+          setIsLoading(false);
+        }).catch((error) => {
+          console.error("Failed to load periods:", error);
+          setIsLoading(false);
+        });
+      } else {
+        console.error("No authenticated user found");
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }).catch((error) => {
-      console.error("Failed to load periods:", error);
+      console.error("Failed to get session:", error);
       setIsLoading(false);
     });
-  }, [periodService]);
+  }, []);
 
   const createNewPeriod = useCallback(async (name: string) => {
+    if (!periodService) return;
+
     const currentPeriod = periods.find(p => p.id === currentPeriodId);
     const copiedCards = currentPeriod ? [...currentPeriod.cards] : [];
 
@@ -134,7 +154,7 @@ export function PeriodManager() {
   }, [periods]);
 
   const confirmSwitchPeriod = useCallback(async () => {
-    if (!pendingPeriodId) {
+    if (!periodService || !pendingPeriodId) {
       setSwitchDialogOpen(false);
       return;
     }
@@ -161,6 +181,8 @@ export function PeriodManager() {
     periodId: string, 
     data: Partial<Pick<Period, 'cards' | 'transactions' | 'bankTotal' | 'totalSavings' | 'visibleCardIds'>>
   ) => {
+    if (!periodService) return;
+
     try {
       const updatedPeriod = await periodService.onUpdatePeriodData(periodId, data);
       setPeriods(prev => prev.map(period =>
@@ -179,7 +201,7 @@ export function PeriodManager() {
   }, []);
 
   const confirmDeletePeriod = useCallback(async () => {
-    if (!pendingDeletePeriodId) {
+    if (!periodService || !pendingDeletePeriodId) {
       setDeleteDialogOpen(false);
       return;
     }
@@ -217,7 +239,7 @@ export function PeriodManager() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <p className="text-muted-foreground">Loading periods...</p>
       </div>
     );

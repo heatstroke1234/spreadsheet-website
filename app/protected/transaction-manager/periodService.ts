@@ -44,60 +44,60 @@ export type PeriodService = {
   updatePeriodTotals: (periodId: string, totals: { bankTotal?: number; totalSavings?: number }) => Promise<void>;
 };
 
-export function createPeriodService(client: DbClient): PeriodService {
+export function createPeriodService(client: DbClient, userId: string): PeriodService {
   return {
-    listPeriods: () => listPeriods(client),
+    listPeriods: () => listPeriods(client, userId),
     
-    getPeriod: (periodId: string) => getPeriod(client, periodId),
+    getPeriod: (periodId: string) => getPeriod(client, periodId, userId),
     
     onCreatePeriod: async (name: string) => {
-      return repoCreatePeriod(client, name);
+      return repoCreatePeriod(client, name, userId);
     },
     
     onSwitchPeriod: async (periodId: string) => {
-      return getPeriod(client, periodId);
+      return getPeriod(client, periodId, userId);
     },
     
     onUpdatePeriodData: async (
       periodId: string,
       data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
     ) => {
-      return repoUpdatePeriodData(client, periodId, data);
+      return repoUpdatePeriodData(client, periodId, userId, data);
     },
     
     onDeletePeriod: async (periodId: string) => {
-      return repoDeletePeriod(client, periodId);
+      return repoDeletePeriod(client, periodId, userId);
     },
     
     // Granular Card Operations
     createCard: async (periodId: string, card: CreditCard) => {
-      return createCard(client, periodId, card);
+      return createCard(client, periodId, userId, card);
     },
     
     updateCard: async (cardId: string, card: Partial<CreditCard>) => {
-      return updateCard(client, cardId, card);
+      return updateCard(client, cardId, userId, card);
     },
     
     deleteCard: async (cardId: string) => {
-      return deleteCard(client, cardId);
+      return deleteCard(client, cardId, userId);
     },
     
     // Granular Transaction Operations
     createTransaction: async (periodId: string, transaction: Transaction) => {
-      return createTransaction(client, periodId, transaction);
+      return createTransaction(client, periodId, userId, transaction);
     },
     
     updateTransaction: async (transactionId: string, transaction: Partial<Transaction>) => {
-      return updateTransaction(client, transactionId, transaction);
+      return updateTransaction(client, transactionId, userId, transaction);
     },
     
     deleteTransaction: async (transactionId: string) => {
-      return deleteTransaction(client, transactionId);
+      return deleteTransaction(client, transactionId, userId);
     },
     
     // Period Totals
     updatePeriodTotals: async (periodId: string, totals: { bankTotal?: number; totalSavings?: number }) => {
-      return updatePeriodTotals(client, periodId, totals);
+      return updatePeriodTotals(client, periodId, userId, totals);
     },
   };
 }

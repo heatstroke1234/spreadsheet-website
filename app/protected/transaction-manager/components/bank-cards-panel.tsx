@@ -85,7 +85,7 @@ export function BankCardsPanel({
                     <p className="text-sm opacity-95">Limit: ${card.limit.toLocaleString()}</p>
                     <p className="text-sm opacity-90">Spent: ${charged.toFixed(2)}</p>
                     <p className="text-sm opacity-90">
-                      Utilization: {(card.limit > 0 ? Math.min(100, (charged / card.limit) * 100).toFixed(1) : "0")}%
+                      Utilization: {(card.limit > 0 ? Math.min(100, (charged / card.limit) * 100).toFixed(2) : "0")}%
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">

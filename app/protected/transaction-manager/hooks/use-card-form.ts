@@ -30,7 +30,7 @@ export function useCardForm({
   periodId,
   createCard,
   updateCard,
-  deleteCard,
+  deleteCard: deleteCardFn,
 }: UseCardFormParams) {
   const [cardName, setCardName] = useState("");
   const [cardLimit, setCardLimit] = useState("");
@@ -134,6 +134,24 @@ export function useCardForm({
     setCardDialogOpen(false);
   };
 
+  // Expose delete function for use by parent component
+  const deleteCard = async (cardId: string) => {
+    if (deleteCardFn) {
+      try {
+        await deleteCardFn(cardId);
+      } catch (error) {
+        console.error("Failed to delete card:", error);
+        // Fallback to local state
+        const updatedCards = cards.filter((card) => card.id !== cardId);
+        const updatedVisibleCardIds = { ...visibleCardIds };
+        delete updatedVisibleCardIds[cardId];
+        setCards(updatedCards);
+        setVisibleCardIds(updatedVisibleCardIds);
+        updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
+      }
+    }
+  };
+
   return {
     cardName,
     setCardName,
@@ -146,5 +164,6 @@ export function useCardForm({
     addCard,
     startEditCard,
     onCardDialogOpenChange,
+    deleteCard,
   };
 }

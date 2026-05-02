@@ -34,7 +34,11 @@ export function UpdatePasswordForm({ className, ...props }: React.ComponentProps
       // Update this route to redirect to an authenticated route. The user already has an active session.
       router.push('/protected')
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
+      if (error instanceof Error) {
+        setError((error as Error).message);
+      } else {
+        setError('An error occurred');
+      }
     } finally {
       setIsLoading(false)
     }

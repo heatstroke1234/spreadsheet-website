@@ -181,6 +181,7 @@ export function TransactionManager({
     periodId: currentPeriod?.id,
     createCard,
     updateCard,
+    deleteCard: deleteCardFn,
   });
 
   const deleteCard = async (cardId: string) => {
@@ -240,6 +241,7 @@ export function TransactionManager({
     periodId: currentPeriod?.id,
     createTransaction,
     updateTransaction,
+    deleteTransaction: deleteTransactionFn,
     updatePeriodTotals,
   });
 

@@ -38,7 +38,7 @@ export function useTransactionForm({
   periodId,
   createTransaction,
   updateTransaction,
-  deleteTransaction,
+  deleteTransaction: deleteTransactionFn,
   updatePeriodTotals,
 }: UseTransactionFormParams) {
   const [txAmount, setTxAmount] = useState("");
@@ -240,6 +240,42 @@ export function useTransactionForm({
     setTxDialogOpen(true);
   };
 
+  // Expose delete function for use by parent component
+  const deleteTransaction = async (txId: string) => {
+    if (deleteTransactionFn) {
+      try {
+        await deleteTransactionFn(txId);
+      } catch (error) {
+        console.error("Failed to delete transaction:", error);
+        // Fallback to local state
+        const txToDelete = transactions.find((tx) => tx.id === txId);
+        let newBankTotal = bankTotal;
+        let newTotalSavings = totalSavings;
+
+        if (txToDelete) {
+          if (txToDelete.method === "bank") {
+            newBankTotal += txToDelete.amount - (txToDelete.savingsAmount ?? 0);
+            newTotalSavings -= txToDelete.savingsAmount ?? 0;
+          } else if (txToDelete.method === "debit") {
+            newBankTotal += txToDelete.amount;
+          } else if (txToDelete.method === "card") {
+            newBankTotal += txToDelete.amount;
+          }
+        }
+
+        const updatedTransactions = transactions.filter((tx) => tx.id !== txId);
+        setTransactions(updatedTransactions);
+        setBankTotal(newBankTotal);
+        setTotalSavings(newTotalSavings);
+        updateCurrentPeriodData({
+          transactions: updatedTransactions,
+          bankTotal: newBankTotal,
+          totalSavings: newTotalSavings,
+        });
+      }
+    }
+  };
+
   return {
     txAmount,
     setTxAmount,
@@ -260,5 +296,6 @@ export function useTransactionForm({
     addTransaction,
     startEditTransaction,
     onTxDialogOpenChange,
+    deleteTransaction,
   };
 }

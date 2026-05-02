@@ -24,8 +24,15 @@ export type UpdatePeriodDataInput = Partial<
 export async function createCard(
   client: DbClient,
   periodId: string,
+  userId: string,
   card: CreditCard,
 ): Promise<CreditCard> {
+  // Verify period belongs to user before creating card
+  const period = await getPeriod(client, periodId, userId);
+  if (!period) {
+    throw new Error("Period not found or access denied");
+  }
+
   const { data, error } = await client
     .from("credit_cards")
     .insert(buildCardInsert(periodId, card))
@@ -39,8 +46,26 @@ export async function createCard(
 export async function updateCard(
   client: DbClient,
   cardId: string,
+  userId: string,
   card: Partial<CreditCard>,
 ): Promise<CreditCard> {
+  // First get the card to find its period
+  const { data: cardData, error: cardError } = await client
+    .from("credit_cards")
+    .select("period_id")
+    .eq("id", cardId)
+    .single();
+
+  if (cardError || !cardData) {
+    throw new Error("Card not found");
+  }
+
+  // Verify the period belongs to the user
+  const period = await getPeriod(client, cardData.period_id, userId);
+  if (!period) {
+    throw new Error("Access denied");
+  }
+
   const patch: Partial<Inserts<"credit_cards">> = {};
   
   if (card.name !== undefined) patch.name = card.name;
@@ -58,7 +83,24 @@ export async function updateCard(
   return mapCard(data as CreditCardRow);
 }
 
-export async function deleteCard(client: DbClient, cardId: string): Promise<void> {
+export async function deleteCard(client: DbClient, cardId: string, userId: string): Promise<void> {
+  // First get the card to find its period
+  const { data: cardData, error: cardError } = await client
+    .from("credit_cards")
+    .select("period_id")
+    .eq("id", cardId)
+    .single();
+
+  if (cardError || !cardData) {
+    throw new Error("Card not found");
+  }
+
+  // Verify the period belongs to the user
+  const period = await getPeriod(client, cardData.period_id, userId);
+  if (!period) {
+    throw new Error("Access denied");
+  }
+
   const { error } = await client.from("credit_cards").delete().eq("id", cardId);
   assertNoError(error, "Failed to delete credit card");
 }
@@ -68,8 +110,15 @@ export async function deleteCard(client: DbClient, cardId: string): Promise<void
 export async function createTransaction(
   client: DbClient,
   periodId: string,
+  userId: string,
   transaction: Transaction,
 ): Promise<Transaction> {
+  // Verify period belongs to user before creating transaction
+  const period = await getPeriod(client, periodId, userId);
+  if (!period) {
+    throw new Error("Period not found or access denied");
+  }
+
   const { data, error } = await client
     .from("transactions")
     .insert(buildTransactionInsert(periodId, transaction))
@@ -83,8 +132,26 @@ export async function createTransaction(
 export async function updateTransaction(
   client: DbClient,
   transactionId: string,
+  userId: string,
   transaction: Partial<Transaction>,
 ): Promise<Transaction> {
+  // First get the transaction to find its period
+  const { data: txData, error: txError } = await client
+    .from("transactions")
+    .select("period_id")
+    .eq("id", transactionId)
+    .single();
+
+  if (txError || !txData) {
+    throw new Error("Transaction not found");
+  }
+
+  // Verify the period belongs to the user
+  const period = await getPeriod(client, txData.period_id, userId);
+  if (!period) {
+    throw new Error("Access denied");
+  }
+
   const patch: Partial<Inserts<"transactions">> = {};
   
   if (transaction.amount !== undefined) patch.amount = transaction.amount;
@@ -107,7 +174,24 @@ export async function updateTransaction(
   return mapTransaction(data as TransactionRow);
 }
 
-export async function deleteTransaction(client: DbClient, transactionId: string): Promise<void> {
+export async function deleteTransaction(client: DbClient, transactionId: string, userId: string): Promise<void> {
+  // First get the transaction to find its period
+  const { data: txData, error: txError } = await client
+    .from("transactions")
+    .select("period_id")
+    .eq("id", transactionId)
+    .single();
+
+  if (txError || !txData) {
+    throw new Error("Transaction not found");
+  }
+
+  // Verify the period belongs to the user
+  const period = await getPeriod(client, txData.period_id, userId);
+  if (!period) {
+    throw new Error("Access denied");
+  }
+
   const { error } = await client.from("transactions").delete().eq("id", transactionId);
   assertNoError(error, "Failed to delete transaction");
 }
@@ -117,8 +201,15 @@ export async function deleteTransaction(client: DbClient, transactionId: string)
 export async function updatePeriodTotals(
   client: DbClient,
   periodId: string,
+  userId: string,
   totals: { bankTotal?: number; totalSavings?: number },
 ): Promise<void> {
+  // Verify period belongs to user
+  const period = await getPeriod(client, periodId, userId);
+  if (!period) {
+    throw new Error("Period not found or access denied");
+  }
+
   const periodPatch: Updates<"periods"> = {};
 
   if (totals.bankTotal !== undefined) {
@@ -130,7 +221,7 @@ export async function updatePeriodTotals(
   }
 
   if (Object.keys(periodPatch).length > 0) {
-    const { error } = await client.from("periods").update(periodPatch).eq("id", periodId);
+    const { error } = await client.from("periods").update(periodPatch).eq("id", periodId).eq("user_id", userId);
     assertNoError(error, "Failed to update period totals");
   }
 }
@@ -141,7 +232,7 @@ const PERIOD_SELECT = `
   created_at,
   bank_total,
   total_savings,
-  credit_cards (
+  credit_cards!period_id (
     id,
     name,
     credit_limit,
@@ -149,7 +240,7 @@ const PERIOD_SELECT = `
     created_at,
     updated_at
   ),
-  transactions (
+  transactions!period_id (
     id,
     amount,
     method,
@@ -162,7 +253,7 @@ const PERIOD_SELECT = `
     created_at,
     updated_at
   ),
-  period_visible_cards (
+  period_visible_cards!period_id (
     card_id,
     is_visible,
     created_at,
@@ -284,20 +375,31 @@ async function replaceTransactions(
   periodId: string,
   transactions: Transaction[],
 ): Promise<void> {
-  const { error: deleteError } = await client
-    .from("transactions")
-    .delete()
-    .eq("period_id", periodId);
+  if (transactions.length > 0) {
+    // Upsert all transactions (insert or update based on id)
+    const { error: upsertError } = await client
+      .from("transactions")
+      .upsert(transactions.map((transaction) => buildTransactionInsert(periodId, transaction)), {
+        onConflict: "id",
+      });
 
-  assertNoError(deleteError, "Failed to clear transactions");
+    assertNoError(upsertError, "Failed to upsert transactions");
 
-  if (transactions.length === 0) return;
+    // Delete any transactions that were in DB but not in the new array
+    const ids = transactions.map((transaction) => transaction.id);
+    const { error: deleteMissingError } = await client
+      .from("transactions")
+      .delete()
+      .eq("period_id", periodId)
+      .not("id", "in", toPostgrestInList(ids));
 
-  const { error: insertError } = await client
-    .from("transactions")
-    .insert(transactions.map((transaction) => buildTransactionInsert(periodId, transaction)));
+    assertNoError(deleteMissingError, "Failed to delete removed transactions");
+    return;
+  }
 
-  assertNoError(insertError, "Failed to insert transactions");
+  // If empty array, delete all transactions for this period
+  const { error } = await client.from("transactions").delete().eq("period_id", periodId);
+  assertNoError(error, "Failed to clear transactions");
 }
 
 async function replaceVisibleCards(
@@ -326,21 +428,23 @@ async function replaceVisibleCards(
   assertNoError(insertError, "Failed to insert visible card rows");
 }
 
-export async function listPeriods(client: DbClient): Promise<Period[]> {
+export async function listPeriods(client: DbClient, userId: string): Promise<Period[]> {
   const { data, error } = await client
     .from("periods")
     .select(PERIOD_SELECT)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   assertNoError(error, "Failed to fetch periods");
   return ((data ?? []) as PeriodRecord[]).map(mapPeriod);
 }
 
-export async function getPeriod(client: DbClient, periodId: string): Promise<Period | null> {
+export async function getPeriod(client: DbClient, periodId: string, userId: string): Promise<Period | null> {
   const { data, error } = await client
     .from("periods")
     .select(PERIOD_SELECT)
     .eq("id", periodId)
+    .eq("user_id", userId)
     .single();
 
   if (error && "code" in error && error.code === "PGRST116") {
@@ -351,10 +455,10 @@ export async function getPeriod(client: DbClient, periodId: string): Promise<Per
   return mapPeriod(data as PeriodRecord);
 }
 
-export async function createPeriod(client: DbClient, name: string): Promise<Period> {
+export async function createPeriod(client: DbClient, name: string, userId: string): Promise<Period> {
   const { data, error } = await client
     .from("periods")
-    .insert({ name })
+    .insert({ name, user_id: userId })
     .select(PERIOD_SELECT)
     .single();
 
@@ -362,14 +466,15 @@ export async function createPeriod(client: DbClient, name: string): Promise<Peri
   return mapPeriod(data as PeriodRecord);
 }
 
-export async function deletePeriod(client: DbClient, periodId: string): Promise<void> {
-  const { error } = await client.from("periods").delete().eq("id", periodId);
+export async function deletePeriod(client: DbClient, periodId: string, userId: string): Promise<void> {
+  const { error } = await client.from("periods").delete().eq("id", periodId).eq("user_id", userId);
   assertNoError(error, "Failed to delete period");
 }
 
 export async function updatePeriodData(
   client: DbClient,
   periodId: string,
+  userId: string,
   data: UpdatePeriodDataInput,
 ): Promise<Period> {
   const periodPatch: Updates<"periods"> = {};
@@ -383,7 +488,7 @@ export async function updatePeriodData(
   }
 
   if (Object.keys(periodPatch).length > 0) {
-    const { error } = await client.from("periods").update(periodPatch).eq("id", periodId);
+    const { error } = await client.from("periods").update(periodPatch).eq("id", periodId).eq("user_id", userId);
     assertNoError(error, "Failed to update period totals");
   }
 
@@ -403,7 +508,7 @@ export async function updatePeriodData(
     await replaceVisibleCards(client, periodId, data.visibleCardIds);
   }
 
-  const updated = await getPeriod(client, periodId);
+  const updated = await getPeriod(client, periodId, userId);
   if (!updated) {
     throw new Error(`Period ${periodId} was not found after update`);
   }
