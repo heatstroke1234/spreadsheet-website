@@ -1,3 +1,4 @@
+import { LoaderCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import { CreditCard } from "../types";
 type CardDeleteDialogProps = {
   open: boolean;
   cardToDelete: CreditCard | null;
+  isLoading?: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirmDelete: () => void;
 };
@@ -20,6 +22,7 @@ type CardDeleteDialogProps = {
 export function CardDeleteDialog({
   open,
   cardToDelete,
+  isLoading = false,
   onOpenChange,
   onConfirmDelete,
 }: CardDeleteDialogProps) {
@@ -34,9 +37,12 @@ export function CardDeleteDialog({
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" disabled={isLoading}>
+              Cancel
+            </Button>
           </DialogClose>
-          <Button variant="destructive" onClick={onConfirmDelete}>
+          <Button variant="destructive" onClick={onConfirmDelete} disabled={isLoading}>
+            {isLoading && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
             Delete Card
           </Button>
         </DialogFooter>

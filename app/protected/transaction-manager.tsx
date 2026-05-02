@@ -102,6 +102,7 @@ export function TransactionManager({
   // Card deletion confirmation state
   const [cardDeleteDialogOpen, setCardDeleteDialogOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<CreditCard | null>(null);
+  const [cardDeleteLoading, setCardDeleteLoading] = useState(false);
 
   // Bank summary dialog state
   const [bankSummaryDialogOpen, setBankSummaryDialogOpen] = useState(false);
@@ -131,6 +132,7 @@ export function TransactionManager({
     handleCreatePeriod,
     handleSwitchPeriod,
     handleDeletePeriod,
+    isLoading: periodIsLoading,
   } = usePeriodManagement({
     onCreatePeriod,
     onSwitchPeriod,
@@ -172,6 +174,8 @@ export function TransactionManager({
     addCard,
     startEditCard,
     onCardDialogOpenChange,
+    isLoading: cardIsLoading,
+    deletingCardIds,
   } = useCardForm({
     cards,
     visibleCardIds,
@@ -185,28 +189,33 @@ export function TransactionManager({
   });
 
   const deleteCard = async (cardId: string) => {
-    // Use granular delete if available
-    if (deleteCardFn) {
-      try {
-        await deleteCardFn(cardId);
-      } catch (error) {
-        console.error("Failed to delete card:", error);
+    setCardDeleteLoading(true);
+    try {
+      // Use granular delete if available
+      if (deleteCardFn) {
+        try {
+          await deleteCardFn(cardId);
+        } catch (error) {
+          console.error("Failed to delete card:", error);
+        }
       }
+      
+      const updatedCards = cards.filter((card) => card.id !== cardId);
+      const updatedTransactions = transactions.filter((tx) => tx.cardId !== cardId);
+      const updatedVisibleCardIds = { ...visibleCardIds };
+      delete updatedVisibleCardIds[cardId];
+      
+      setCards(updatedCards);
+      setTransactions(updatedTransactions);
+      setVisibleCardIds(updatedVisibleCardIds);
+      updateCurrentPeriodData({ 
+        cards: updatedCards, 
+        transactions: updatedTransactions, 
+        visibleCardIds: updatedVisibleCardIds 
+      });
+    } finally {
+      setCardDeleteLoading(false);
     }
-    
-    const updatedCards = cards.filter((card) => card.id !== cardId);
-    const updatedTransactions = transactions.filter((tx) => tx.cardId !== cardId);
-    const updatedVisibleCardIds = { ...visibleCardIds };
-    delete updatedVisibleCardIds[cardId];
-    
-    setCards(updatedCards);
-    setTransactions(updatedTransactions);
-    setVisibleCardIds(updatedVisibleCardIds);
-    updateCurrentPeriodData({ 
-      cards: updatedCards, 
-      transactions: updatedTransactions, 
-      visibleCardIds: updatedVisibleCardIds 
-    });
   };
 
   const {
@@ -229,6 +238,9 @@ export function TransactionManager({
     addTransaction,
     startEditTransaction,
     onTxDialogOpenChange,
+    isLoading: txIsLoading,
+    deletingTxIds,
+    deleteTransaction: deleteTransactionFromHook,
   } = useTransactionForm({
     cards,
     transactions,
@@ -246,37 +258,8 @@ export function TransactionManager({
   });
 
   const deleteTransaction = async (txId: string) => {
-    const txToDelete = transactions.find(tx => tx.id === txId);
-    
-    // Use granular delete if available
-    if (deleteTransactionFn) {
-      try {
-        await deleteTransactionFn(txId);
-      } catch (error) {
-        console.error("Failed to delete transaction:", error);
-      }
-    }
-    
-    const updatedTransactions = transactions.filter((tx) => tx.id !== txId);
-    setTransactions(updatedTransactions);
-
-    // Update bank balance when deleting transactions
-    let newBankTotal = bankTotal;
-    let newTotalSavings = totalSavings;
-    if (txToDelete) {
-      if (txToDelete.method === "bank") {
-        const savings = txToDelete.savingsAmount ?? 0;
-        newBankTotal -= (txToDelete.amount - savings);
-        newTotalSavings -= savings;
-      } else if (txToDelete.method === "debit") {
-        newBankTotal += txToDelete.amount;
-      } else if (txToDelete.method === "card") {
-        newBankTotal += txToDelete.amount;
-      }
-    }
-    setBankTotal(newBankTotal);
-    setTotalSavings(newTotalSavings);
-    updateCurrentPeriodData({ transactions: updatedTransactions, bankTotal: newBankTotal, totalSavings: newTotalSavings });
+    // Use the hook's delete function which handles loading state and fallback
+    await deleteTransactionFromHook(txId);
   };
 
   return (
@@ -316,6 +299,7 @@ export function TransactionManager({
               cardLimit={cardLimit}
               cardColor={cardColor}
               hasCurrentPeriod={Boolean(currentPeriod)}
+              isLoading={cardIsLoading}
               onOpenChange={onCardDialogOpenChange}
               onSubmit={addCard}
               onCardNameChange={setCardName}
@@ -335,6 +319,7 @@ export function TransactionManager({
               txCardId={txCardId}
               cards={cards}
               hasCurrentPeriod={Boolean(currentPeriod)}
+              isLoading={txIsLoading}
               onOpenChange={onTxDialogOpenChange}
               onSubmit={addTransaction}
               onTxAmountChange={setTxAmount}
@@ -385,6 +370,7 @@ export function TransactionManager({
               visibleCardIds={visibleCardIds}
               txSortBy={txSortBy}
               txSortOrder={txSortOrder}
+              deletingTxIds={deletingTxIds}
               onSetTxSearch={setTxSearch}
               onSetTxPage={setTxPage}
               onSetShowDebit={setShowDebit}
@@ -406,6 +392,7 @@ export function TransactionManager({
               bankTotal={bankTotal}
               cards={cards}
               transactions={transactions}
+              deletingCardIds={deletingCardIds}
               onOpenSummary={() => setBankSummaryDialogOpen(true)}
               onEditCard={startEditCard}
               onRequestDeleteCard={(card) => {
@@ -421,6 +408,7 @@ export function TransactionManager({
       <PeriodDialog
         open={periodDialogOpen}
         newPeriodName={newPeriodName}
+        isLoading={periodIsLoading}
         onOpenChange={setPeriodDialogOpen}
         onNewPeriodNameChange={setNewPeriodName}
         onSubmit={handleCreatePeriod}
@@ -437,6 +425,7 @@ export function TransactionManager({
       <CardDeleteDialog
         open={cardDeleteDialogOpen}
         cardToDelete={cardToDelete}
+        isLoading={cardDeleteLoading}
         onOpenChange={setCardDeleteDialogOpen}
         onConfirmDelete={() => {
           if (cardToDelete) {

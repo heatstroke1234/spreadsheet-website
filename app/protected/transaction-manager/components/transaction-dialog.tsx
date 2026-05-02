@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { LoaderCircle } from "lucide-react";
 import {
   Dialog,
   DialogTrigger,
@@ -24,6 +25,7 @@ type TransactionDialogProps = {
   txCardId: string;
   cards: CreditCard[];
   hasCurrentPeriod: boolean;
+  isLoading?: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onTxAmountChange: (value: string) => void;
@@ -47,6 +49,7 @@ export function TransactionDialog({
   txCardId,
   cards,
   hasCurrentPeriod,
+  isLoading = false,
   onOpenChange,
   onSubmit,
   onTxAmountChange,
@@ -87,6 +90,7 @@ export function TransactionDialog({
               onChange={(e) => onTxAmountChange(e.target.value)}
               className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -99,6 +103,7 @@ export function TransactionDialog({
               value={txMethod}
               onChange={(e) => onTxMethodChange(e.target.value as "debit" | "card" | "bank")}
               className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              disabled={isLoading}
             >
               <option value="debit">Debit</option>
               <option value="card">Credit Card</option>
@@ -116,6 +121,7 @@ export function TransactionDialog({
                 value={txCategory}
                 onChange={(e) => onTxCategoryChange(e.target.value as "necessary" | "recreation")}
                 className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                disabled={isLoading}
               >
                 <option value="necessary">Necessary</option>
                 <option value="recreation">Recreation</option>
@@ -133,6 +139,7 @@ export function TransactionDialog({
                 value={txBankCategory}
                 onChange={(e) => onTxBankCategoryChange(e.target.value as "transfer" | "salary")}
                 className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                disabled={isLoading}
               >
                 <option value="transfer">Transfer</option>
                 <option value="salary">Salary</option>
@@ -155,6 +162,7 @@ export function TransactionDialog({
                 onChange={(e) => onTxSavingsPercentChange(e.target.value)}
                 className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 placeholder="e.g. 20"
+                disabled={isLoading}
               />
               {txAmount && Number(txAmount) > 0 && Number(txSavingsPercent) > 0 && (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -176,6 +184,7 @@ export function TransactionDialog({
                 onChange={(e) => onTxCardIdChange(e.target.value)}
                 className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 required
+                disabled={isLoading}
               >
                 <option value="">Choose a card</option>
                 {cards.map((card) => (
@@ -198,14 +207,20 @@ export function TransactionDialog({
               onChange={(e) => onTxDescriptionChange(e.target.value)}
               className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               placeholder="e.g. Grocery, utilities, refund"
+              disabled={isLoading}
             />
           </div>
 
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" disabled={isLoading}>
+                Cancel
+              </Button>
             </DialogClose>
-            <Button type="submit">{editingTxId ? "Update Transaction" : "Save Transaction"}</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
+              {editingTxId ? "Update Transaction" : "Save Transaction"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

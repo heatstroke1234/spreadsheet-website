@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { LoaderCircle } from "lucide-react";
 import {
   Dialog,
   DialogTrigger,
@@ -18,6 +19,7 @@ type CardDialogProps = {
   cardLimit: string;
   cardColor: string;
   hasCurrentPeriod: boolean;
+  isLoading?: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCardNameChange: (value: string) => void;
@@ -32,6 +34,7 @@ export function CardDialog({
   cardLimit,
   cardColor,
   hasCurrentPeriod,
+  isLoading = false,
   onOpenChange,
   onSubmit,
   onCardNameChange,
@@ -63,6 +66,7 @@ export function CardDialog({
               onChange={(e) => onCardNameChange(e.target.value)}
               className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -78,6 +82,7 @@ export function CardDialog({
               onChange={(e) => onCardLimitChange(e.target.value)}
               className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -91,14 +96,20 @@ export function CardDialog({
               value={cardColor}
               onChange={(e) => onCardColorChange(e.target.value)}
               className="h-10 w-16 cursor-pointer rounded border-0 p-0"
+              disabled={isLoading}
             />
           </div>
 
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" disabled={isLoading}>
+                Cancel
+              </Button>
             </DialogClose>
-            <Button type="submit">{editingCardId ? "Update Card" : "Save Card"}</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
+              {editingCardId ? "Update Card" : "Save Card"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

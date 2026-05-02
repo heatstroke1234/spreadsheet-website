@@ -15,13 +15,19 @@ export function usePeriodManagement({
 }: UsePeriodManagementParams) {
   const [newPeriodName, setNewPeriodName] = useState("");
   const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCreatePeriod = (event: FormEvent<HTMLFormElement>) => {
+  const handleCreatePeriod = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (newPeriodName.trim()) {
-      onCreatePeriod(newPeriodName.trim());
-      setNewPeriodName("");
-      setPeriodDialogOpen(false);
+    setIsLoading(true);
+    try {
+      if (newPeriodName.trim()) {
+        onCreatePeriod(newPeriodName.trim());
+        setNewPeriodName("");
+        setPeriodDialogOpen(false);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -42,5 +48,6 @@ export function usePeriodManagement({
     handleCreatePeriod,
     handleSwitchPeriod,
     handleDeletePeriod,
+    isLoading,
   };
 }

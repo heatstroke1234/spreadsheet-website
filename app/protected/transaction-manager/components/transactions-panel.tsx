@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { LoaderCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -46,6 +47,7 @@ type TransactionsPanelProps = {
   visibleCardIds: Record<string, boolean>;
   txSortBy: TxSortBy;
   txSortOrder: TxSortOrder;
+  deletingTxIds?: Set<string>;
   onSetTxSearch: (value: string) => void;
   onSetTxPage: (value: number | ((prev: number) => number)) => void;
   onSetShowDebit: (value: boolean) => void;
@@ -75,6 +77,7 @@ export function TransactionsPanel({
   visibleCardIds,
   txSortBy,
   txSortOrder,
+  deletingTxIds = new Set(),
   onSetTxSearch,
   onSetTxPage,
   onSetShowDebit,
@@ -345,8 +348,10 @@ export function TransactionsPanel({
                       <button
                         type="button"
                         onClick={() => onDeleteTransaction(tx.id)}
-                        className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white"
+                        disabled={deletingTxIds.has(tx.id)}
+                        className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1"
                       >
+                        {deletingTxIds.has(tx.id) && <LoaderCircle className="h-3 w-3 animate-spin" />}
                         Delete
                       </button>
                     </div>

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { LoaderCircle } from "lucide-react";
 import {
   Empty,
   EmptyHeader,
@@ -11,6 +12,7 @@ type BankCardsPanelProps = {
   bankTotal: number;
   cards: CreditCard[];
   transactions: Transaction[];
+  deletingCardIds?: Set<string>;
   onOpenSummary: () => void;
   onEditCard: (card: CreditCard) => void;
   onRequestDeleteCard: (card: CreditCard) => void;
@@ -20,6 +22,7 @@ export function BankCardsPanel({
   bankTotal,
   cards,
   transactions,
+  deletingCardIds = new Set(),
   onOpenSummary,
   onEditCard,
   onRequestDeleteCard,
@@ -92,17 +95,19 @@ export function BankCardsPanel({
                     <button
                       type="button"
                       onClick={() => onEditCard(card)}
-                      className="rounded bg-white px-2 py-1 text-xs font-medium text-zinc-900"
+                      disabled={deletingCardIds.has(card.id)}
+                      className="rounded bg-white px-2 py-1 text-xs font-medium text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => onRequestDeleteCard(card)}
-                      disabled={hasTransactions}
-                      className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={hasTransactions || deletingCardIds.has(card.id)}
+                      className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1"
                       title={hasTransactions ? "Cannot delete card with existing transactions" : ""}
                     >
+                      {deletingCardIds.has(card.id) && <LoaderCircle className="h-3 w-3 animate-spin" />}
                       Delete
                     </button>
                   </div>

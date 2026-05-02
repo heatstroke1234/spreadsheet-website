@@ -50,6 +50,8 @@ export function useTransactionForm({
   const [txCardId, setTxCardId] = useState<string>("");
   const [txDialogOpen, setTxDialogOpen] = useState(false);
   const [editingTxId, setEditingTxId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [deletingTxIds, setDeletingTxIds] = useState<Set<string>>(new Set());
 
   const resetTransactionForm = () => {
     setEditingTxId("");
@@ -71,159 +73,165 @@ export function useTransactionForm({
 
   const addTransaction = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setIsLoading(true);
 
     const amount = Number(txAmount);
     if (Number.isNaN(amount) || amount <= 0) {
+      setIsLoading(false);
       return;
     }
 
-    const card = cards.find((item) => item.id === txCardId);
-    const cardNameForTx =
-      txMethod === "debit" ? "Debit" : txMethod === "bank" ? "Bank Deposit" : card?.name || "Unknown card";
+    try {
+      const card = cards.find((item) => item.id === txCardId);
+      const cardNameForTx =
+        txMethod === "debit" ? "Debit" : txMethod === "bank" ? "Bank Deposit" : card?.name || "Unknown card";
 
-    const savingsAmountForTx =
-      txMethod === "bank" && txBankCategory === "salary"
-        ? amount * (Math.max(0, Math.min(100, Number(txSavingsPercent) || 0)) / 100)
-        : 0;
+      const savingsAmountForTx =
+        txMethod === "bank" && txBankCategory === "salary"
+          ? amount * (Math.max(0, Math.min(100, Number(txSavingsPercent) || 0)) / 100)
+          : 0;
 
-    let updatedTransactions: Transaction[];
-    let newBankTotal = bankTotal;
-    let newTotalSavings = totalSavings;
+      let updatedTransactions: Transaction[];
+      let newBankTotal = bankTotal;
+      let newTotalSavings = totalSavings;
 
-    if (editingTxId) {
-      const existingTx = transactions.find((tx) => tx.id === editingTxId);
+      if (editingTxId) {
+        const existingTx = transactions.find((tx) => tx.id === editingTxId);
 
-      const updatedTx: Transaction = {
-        ...existingTx!,
-        amount,
-        method: txMethod,
-        category: txMethod === "bank" ? undefined : txCategory,
-        bankCategory: txMethod === "bank" ? txBankCategory : undefined,
-        savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
-        cardId: txMethod === "card" ? txCardId : undefined,
-        cardName: cardNameForTx,
-        description: txDescription,
-      };
+        const updatedTx: Transaction = {
+          ...existingTx!,
+          amount,
+          method: txMethod,
+          category: txMethod === "bank" ? undefined : txCategory,
+          bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+          savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
+          cardId: txMethod === "card" ? txCardId : undefined,
+          cardName: cardNameForTx,
+          description: txDescription,
+        };
 
-      // Use granular update if available
-      if (updateTransaction) {
-        try {
-          const result = await updateTransaction(editingTxId, {
-            amount,
-            method: txMethod,
-            category: txMethod === "bank" ? undefined : txCategory,
-            bankCategory: txMethod === "bank" ? txBankCategory : undefined,
-            savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
-            cardId: txMethod === "card" ? txCardId : undefined,
-            cardName: cardNameForTx,
-            description: txDescription,
-          });
-          updatedTransactions = transactions.map((tx) =>
-            tx.id === editingTxId ? { ...tx, ...result } : tx
-          );
-        } catch (error) {
-          console.error("Failed to update transaction:", error);
+        // Use granular update if available
+        if (updateTransaction) {
+          try {
+            const result = await updateTransaction(editingTxId, {
+              amount,
+              method: txMethod,
+              category: txMethod === "bank" ? undefined : txCategory,
+              bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+              savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
+              cardId: txMethod === "card" ? txCardId : undefined,
+              cardName: cardNameForTx,
+              description: txDescription,
+            });
+            updatedTransactions = transactions.map((tx) =>
+              tx.id === editingTxId ? { ...tx, ...result } : tx
+            );
+          } catch (error) {
+            console.error("Failed to update transaction:", error);
+            updatedTransactions = transactions.map((tx) =>
+              tx.id === editingTxId ? updatedTx : tx
+            );
+          }
+        } else {
           updatedTransactions = transactions.map((tx) =>
             tx.id === editingTxId ? updatedTx : tx
           );
         }
-      } else {
-        updatedTransactions = transactions.map((tx) =>
-          tx.id === editingTxId ? updatedTx : tx
-        );
-      }
 
-      if (existingTx) {
-        if (existingTx.method === "bank") {
-          const oldSavings = existingTx.savingsAmount ?? 0;
-          newBankTotal -= existingTx.amount - oldSavings;
-          newTotalSavings -= oldSavings;
-        } else if (existingTx.method === "debit") {
-          newBankTotal += existingTx.amount;
-        } else if (existingTx.method === "card") {
-          newBankTotal += existingTx.amount;
+        if (existingTx) {
+          if (existingTx.method === "bank") {
+            const oldSavings = existingTx.savingsAmount ?? 0;
+            newBankTotal -= existingTx.amount - oldSavings;
+            newTotalSavings -= oldSavings;
+          } else if (existingTx.method === "debit") {
+            newBankTotal += existingTx.amount;
+          } else if (existingTx.method === "card") {
+            newBankTotal += existingTx.amount;
+          }
+
+          if (txMethod === "bank") {
+            newBankTotal += amount - savingsAmountForTx;
+            newTotalSavings += savingsAmountForTx;
+          } else if (txMethod === "debit") {
+            newBankTotal -= amount;
+          } else if (txMethod === "card") {
+            newBankTotal -= amount;
+          }
         }
 
-        if (txMethod === "bank") {
-          newBankTotal += amount - savingsAmountForTx;
-          newTotalSavings += savingsAmountForTx;
-        } else if (txMethod === "debit") {
+        setEditingTxId("");
+      } else {
+        const newTransaction: Transaction = {
+          id: crypto.randomUUID(),
+          amount,
+          method: txMethod,
+          category: txMethod === "bank" ? undefined : txCategory,
+          bankCategory: txMethod === "bank" ? txBankCategory : undefined,
+          savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
+          cardId: txMethod === "card" ? txCardId : undefined,
+          cardName: cardNameForTx,
+          description: txDescription,
+          createdAt: new Date().toISOString(),
+        };
+
+        // Use granular create if available
+        if (createTransaction && periodId) {
+          try {
+            const created = await createTransaction(periodId, newTransaction);
+            updatedTransactions = [created, ...transactions];
+          } catch (error) {
+            console.error("Failed to create transaction:", error);
+            updatedTransactions = [newTransaction, ...transactions];
+          }
+        } else {
+          updatedTransactions = [newTransaction, ...transactions];
+        }
+
+        if (txMethod === "debit") {
           newBankTotal -= amount;
         } else if (txMethod === "card") {
           newBankTotal -= amount;
+        } else if (txMethod === "bank") {
+          newBankTotal += amount - savingsAmountForTx;
+          newTotalSavings += savingsAmountForTx;
         }
       }
 
-      setEditingTxId("");
-    } else {
-      const newTransaction: Transaction = {
-        id: crypto.randomUUID(),
-        amount,
-        method: txMethod,
-        category: txMethod === "bank" ? undefined : txCategory,
-        bankCategory: txMethod === "bank" ? txBankCategory : undefined,
-        savingsAmount: savingsAmountForTx > 0 ? savingsAmountForTx : undefined,
-        cardId: txMethod === "card" ? txCardId : undefined,
-        cardName: cardNameForTx,
-        description: txDescription,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Use granular create if available
-      if (createTransaction && periodId) {
+      setTransactions(updatedTransactions);
+      setBankTotal(newBankTotal);
+      setTotalSavings(newTotalSavings);
+      
+      // Use granular totals update if available
+      if (updatePeriodTotals && periodId) {
         try {
-          const created = await createTransaction(periodId, newTransaction);
-          updatedTransactions = [created, ...transactions];
+          await updatePeriodTotals(periodId, { bankTotal: newBankTotal, totalSavings: newTotalSavings });
         } catch (error) {
-          console.error("Failed to create transaction:", error);
-          updatedTransactions = [newTransaction, ...transactions];
+          console.error("Failed to update period totals:", error);
+          updateCurrentPeriodData({
+            transactions: updatedTransactions,
+            bankTotal: newBankTotal,
+            totalSavings: newTotalSavings,
+          });
         }
       } else {
-        updatedTransactions = [newTransaction, ...transactions];
-      }
-
-      if (txMethod === "debit") {
-        newBankTotal -= amount;
-      } else if (txMethod === "card") {
-        newBankTotal -= amount;
-      } else if (txMethod === "bank") {
-        newBankTotal += amount - savingsAmountForTx;
-        newTotalSavings += savingsAmountForTx;
-      }
-    }
-
-    setTransactions(updatedTransactions);
-    setBankTotal(newBankTotal);
-    setTotalSavings(newTotalSavings);
-    
-    // Use granular totals update if available
-    if (updatePeriodTotals && periodId) {
-      try {
-        await updatePeriodTotals(periodId, { bankTotal: newBankTotal, totalSavings: newTotalSavings });
-      } catch (error) {
-        console.error("Failed to update period totals:", error);
         updateCurrentPeriodData({
           transactions: updatedTransactions,
           bankTotal: newBankTotal,
           totalSavings: newTotalSavings,
         });
       }
-    } else {
-      updateCurrentPeriodData({
-        transactions: updatedTransactions,
-        bankTotal: newBankTotal,
-        totalSavings: newTotalSavings,
-      });
-    }
 
-    setTxAmount("");
-    setTxDescription("");
-    setTxCardId("");
-    setTxMethod("debit");
-    setTxCategory("necessary");
-    setTxBankCategory("transfer");
-    setTxSavingsPercent("0");
-    setTxDialogOpen(false);
+      setTxAmount("");
+      setTxDescription("");
+      setTxCardId("");
+      setTxMethod("debit");
+      setTxCategory("necessary");
+      setTxBankCategory("transfer");
+      setTxSavingsPercent("0");
+      setTxDialogOpen(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const startEditTransaction = (tx: Transaction) => {
@@ -242,37 +250,46 @@ export function useTransactionForm({
 
   // Expose delete function for use by parent component
   const deleteTransaction = async (txId: string) => {
-    if (deleteTransactionFn) {
-      try {
-        await deleteTransactionFn(txId);
-      } catch (error) {
-        console.error("Failed to delete transaction:", error);
-        // Fallback to local state
-        const txToDelete = transactions.find((tx) => tx.id === txId);
-        let newBankTotal = bankTotal;
-        let newTotalSavings = totalSavings;
+    setDeletingTxIds((prev) => new Set(prev).add(txId));
+    try {
+      if (deleteTransactionFn) {
+        try {
+          await deleteTransactionFn(txId);
+        } catch (error) {
+          console.error("Failed to delete transaction:", error);
+          // Fallback to local state
+          const txToDelete = transactions.find((tx) => tx.id === txId);
+          let newBankTotal = bankTotal;
+          let newTotalSavings = totalSavings;
 
-        if (txToDelete) {
-          if (txToDelete.method === "bank") {
-            newBankTotal += txToDelete.amount - (txToDelete.savingsAmount ?? 0);
-            newTotalSavings -= txToDelete.savingsAmount ?? 0;
-          } else if (txToDelete.method === "debit") {
-            newBankTotal += txToDelete.amount;
-          } else if (txToDelete.method === "card") {
-            newBankTotal += txToDelete.amount;
+          if (txToDelete) {
+            if (txToDelete.method === "bank") {
+              newBankTotal += txToDelete.amount - (txToDelete.savingsAmount ?? 0);
+              newTotalSavings -= txToDelete.savingsAmount ?? 0;
+            } else if (txToDelete.method === "debit") {
+              newBankTotal += txToDelete.amount;
+            } else if (txToDelete.method === "card") {
+              newBankTotal += txToDelete.amount;
+            }
           }
-        }
 
-        const updatedTransactions = transactions.filter((tx) => tx.id !== txId);
-        setTransactions(updatedTransactions);
-        setBankTotal(newBankTotal);
-        setTotalSavings(newTotalSavings);
-        updateCurrentPeriodData({
-          transactions: updatedTransactions,
-          bankTotal: newBankTotal,
-          totalSavings: newTotalSavings,
-        });
+          const updatedTransactions = transactions.filter((tx) => tx.id !== txId);
+          setTransactions(updatedTransactions);
+          setBankTotal(newBankTotal);
+          setTotalSavings(newTotalSavings);
+          updateCurrentPeriodData({
+            transactions: updatedTransactions,
+            bankTotal: newBankTotal,
+            totalSavings: newTotalSavings,
+          });
+        }
       }
+    } finally {
+      setDeletingTxIds((prev) => {
+        const next = new Set(prev);
+        next.delete(txId);
+        return next;
+      });
     }
   };
 
@@ -297,5 +314,7 @@ export function useTransactionForm({
     startEditTransaction,
     onTxDialogOpenChange,
     deleteTransaction,
+    isLoading,
+    deletingTxIds,
   };
 }
