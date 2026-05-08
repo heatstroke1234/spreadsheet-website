@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env*
+*.log
+README.md
+.DS_Store
+*.md
+coverage
+.nyc_output
+.cache
+dist
+build
+out
+.vercel
