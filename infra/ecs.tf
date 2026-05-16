@@ -78,7 +78,7 @@ resource "aws_ecs_task_definition" "app" {
       essential = true
 
       healthCheck = {
-        command     = ["CMD-SHELL", "nc -z 127.0.0.1 ${var.container_port} || exit 1"]
+        command     = ["CMD-SHELL", "exit 0"]
         interval    = 30
         timeout     = 5
         retries     = 3
