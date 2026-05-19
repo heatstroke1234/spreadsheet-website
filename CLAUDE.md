@@ -75,3 +75,32 @@ page.tsx
 
 ### Period lifecycle
 Creating a new period copies cards from the current period and auto-generates a rollover bank transaction if `bankTotal > 0`.
+
+## Infrastructure & Deployment
+
+### AWS infrastructure (`infra/`)
+Terraform (>= 1.6, AWS provider ~> 5.0) provisions the full AWS stack:
+- **VPC** — public/private subnets, NAT gateway
+- **ECS Fargate** — cluster, service, task definition; CloudWatch log group with 30-day retention
+- **ECR** — Docker image repository (`spreadsheet-website`)
+- **ALB** — HTTPS (443) termination, HTTP→HTTPS redirect, health check at `/`
+- **ACM** — TLS cert for `finance.nikhilv.net`, DNS-validated via Route 53
+- **Route 53** — alias A record pointing to the ALB (uses existing `nikhilv.net` hosted zone)
+- **IAM** — least-privilege task execution role and a dedicated GitHub Actions IAM user
+
+Apply: `cd infra && terraform init && terraform apply`
+
+Sensitive outputs (needed for GitHub secrets after first apply):
+```bash
+terraform output -raw github_actions_access_key_id
+terraform output -raw github_actions_secret_access_key
+```
+
+### CI/CD (`.github/workflows/deploy.yml`)
+Triggers on every push to `main`. Steps:
+1. Build Docker image with Supabase build args (stored as GitHub secrets)
+2. Push two tags to ECR: `sha-<git_sha>` (immutable, for rollback) and `latest`
+3. Download current ECS task definition, swap the image URI, register new revision
+4. Rolling deploy to ECS; waits up to 10 minutes for service stability
+
+Required GitHub Actions secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.

@@ -47,3 +47,18 @@ docker build \
 
 docker run -p 3000:3000 financials-management
 ```
+
+### Production (AWS — automated)
+
+Pushes to `main` trigger a GitHub Actions workflow that builds the Docker image, pushes it to ECR, and does a rolling deploy to ECS Fargate. The app is served over HTTPS at `finance.nikhilv.net`.
+
+The AWS infrastructure (VPC, ECS, ALB, ACM, Route 53, ECR, IAM) is managed with Terraform in `infra/`. To provision from scratch:
+
+```bash
+cd infra
+terraform init
+terraform apply
+# then add the output credentials to GitHub repo secrets
+terraform output -raw github_actions_access_key_id
+terraform output -raw github_actions_secret_access_key
+```

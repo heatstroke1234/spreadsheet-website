@@ -173,68 +173,58 @@ export function TransactionsPanel({
           </DropdownMenu>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="txSortBy" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Sort by
-          </label>
-          <select
-            id="txSortBy"
-            value={txSortBy}
-            onChange={(e) => {
-              onSetSortBy(e.target.value as TxSortBy);
-              onSetTxPage(1);
-            }}
-            className="rounded border p-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          >
-            <option value="date">Date</option>
-            <option value="amount">Amount</option>
-            <option value="method">Method</option>
-          </select>
-          <select
-            id="txSortOrder"
-            value={txSortOrder}
-            onChange={(e) => {
-              onSetSortOrder(e.target.value as TxSortOrder);
-              onSetTxPage(1);
-            }}
-            className="rounded border p-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          >
-            <option value="desc">Desc</option>
-            <option value="asc">Asc</option>
-          </select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+          <div className="flex items-center gap-2">
+            <label htmlFor="txSortBy" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Sort by
+            </label>
+            <select
+              id="txSortBy"
+              value={txSortBy}
+              onChange={(e) => {
+                onSetSortBy(e.target.value as TxSortBy);
+                onSetTxPage(1);
+              }}
+              className="rounded border p-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              <option value="date">Date</option>
+              <option value="amount">Amount</option>
+              <option value="method">Method</option>
+            </select>
+            <select
+              id="txSortOrder"
+              value={txSortOrder}
+              onChange={(e) => {
+                onSetSortOrder(e.target.value as TxSortOrder);
+                onSetTxPage(1);
+              }}
+              className="rounded border p-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+          </div>
 
-          <div className="sm:hidden">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    aria-disabled={effectiveTxPage <= 1}
-                    className={effectiveTxPage <= 1 ? "pointer-events-none opacity-50" : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      if (effectiveTxPage <= 1) return;
-                      onSetTxPage((prev) => Math.max(1, prev - 1));
-                    }}
-                  />
-                </PaginationItem>
-                <PaginationItem>
-                  <span className="px-2 text-sm text-zinc-600 dark:text-zinc-300">
-                    {effectiveTxPage} / {totalPages}
-                  </span>
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext
-                    aria-disabled={effectiveTxPage >= totalPages}
-                    className={effectiveTxPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      if (effectiveTxPage >= totalPages) return;
-                      onSetTxPage((prev) => Math.min(totalPages, prev + 1));
-                    }}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+          <div className="flex items-center justify-between sm:hidden">
+            <button
+              type="button"
+              disabled={effectiveTxPage <= 1}
+              onClick={() => { if (effectiveTxPage > 1) onSetTxPage((prev) => Math.max(1, prev - 1)); }}
+              className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            >
+              ← Prev
+            </button>
+            <span className="text-sm text-zinc-600 dark:text-zinc-300">
+              Page {effectiveTxPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={effectiveTxPage >= totalPages}
+              onClick={() => { if (effectiveTxPage < totalPages) onSetTxPage((prev) => Math.min(totalPages, prev + 1)); }}
+              className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            >
+              Next →
+            </button>
           </div>
 
           <div className="hidden sm:block">
@@ -302,9 +292,9 @@ export function TransactionsPanel({
                 style={tx.method === "card" && txBorderColor ? { borderColor: txBorderColor } : undefined}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-zinc-800 dark:text-zinc-100">{tx.description || "Transaction"}</p>
-                    <div className="mt-1 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-medium text-zinc-800 dark:text-zinc-100">{tx.description || "Transaction"}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
                       <p className="text-sm text-zinc-500 dark:text-zinc-400">
                         {tx.method === "debit"
                           ? "Payment: Debit"
@@ -320,7 +310,7 @@ export function TransactionsPanel({
                     </div>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">{new Date(tx.createdAt).toLocaleString()}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-right">
                     {tx.method === "bank" && tx.savingsAmount && tx.savingsAmount > 0 ? (
                       <TooltipProvider>
                         <Tooltip>
