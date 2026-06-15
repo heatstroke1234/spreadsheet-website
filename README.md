@@ -12,7 +12,7 @@ A personal finance tracking app for managing transactions across billing periods
 
 ## Stack
 
-- [Next.js 16](https://nextjs.org) (App Router, standalone output)
+- [Next.js 16](https://nextjs.org) (App Router)
 - [Supabase](https://supabase.com) — auth + Postgres database
 - [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com)
 - React 19, TypeScript
@@ -37,9 +37,12 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the login page if unauthenticated.
 
-### Production (Docker)
+### Production (Docker — local/self-hosted)
+
+The `Dockerfile` builds a standalone image using Node 20 Alpine. It requires `output: 'standalone'` in `next.config.ts` (remove it when deploying to Amplify — Amplify doesn't use the standalone bundle).
 
 ```bash
+# Add output: 'standalone' to next.config.ts first
 docker build \
   --build-arg NEXT_PUBLIC_SUPABASE_URL=... \
   --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... \
@@ -48,17 +51,19 @@ docker build \
 docker run -p 3000:3000 financials-management
 ```
 
-### Production (AWS — automated)
+### Production (AWS Amplify — automated)
 
-Pushes to `main` trigger a GitHub Actions workflow that builds the Docker image, pushes it to ECR, and does a rolling deploy to ECS Fargate. The app is served over HTTPS at `finance.nikhilv.net`.
+Pushes to `main` automatically trigger an Amplify build and deploy. The app is served over HTTPS at `finance.nikhilv.net` via Amplify's CloudFront distribution.
 
-The AWS infrastructure (VPC, ECS, ALB, ACM, Route 53, ECR, IAM) is managed with Terraform in `infra/`. To provision from scratch:
+The AWS infrastructure (Amplify app + branch, IAM service role, Route 53 records) is managed with Terraform in `infra/`. To provision from scratch:
 
 ```bash
 cd infra
 terraform init
+export TF_VAR_github_token="ghp_..."                    # classic GitHub PAT (repo scope)
+export TF_VAR_supabase_url="https://..."
+export TF_VAR_supabase_publishable_key="sb_publishable_..."
 terraform apply
-# then add the output credentials to GitHub repo secrets
-terraform output -raw github_actions_access_key_id
-terraform output -raw github_actions_secret_access_key
 ```
+
+Amplify reads `amplify.yml` from the repo root for the build spec and the environment variables set in `infra/amplify.tf` are injected at build time.
