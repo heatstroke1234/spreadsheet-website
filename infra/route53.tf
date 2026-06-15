@@ -6,16 +6,26 @@ data "aws_route53_zone" "main" {
   private_zone = false
 }
 
-# A alias record: finance.nikhilv.net → ALB
+# Amplify issues an ACM cert for the custom domain and emits a verification CNAME.
+# The format of certificate_verification_dns_record is "name CNAME value".
+locals {
+  cert_parts      = split(" ", aws_amplify_domain_association.main.certificate_verification_dns_record)
+  subdomain_parts = split(" ", tolist(aws_amplify_domain_association.main.sub_domain)[0].dns_record)
+}
 
+resource "aws_route53_record" "amplify_cert_verification" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.cert_parts[0]
+  type    = local.cert_parts[1]
+  ttl     = 300
+  records = [local.cert_parts[2]]
+}
+
+# finance.nikhilv.net → Amplify CloudFront distribution
 resource "aws_route53_record" "app" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = local.fqdn
-  type    = "A"
-
-  alias {
-    name                   = aws_lb.main.dns_name
-    zone_id                = aws_lb.main.zone_id
-    evaluate_target_health = true
-  }
+  name    = local.subdomain_parts[0]
+  type    = local.subdomain_parts[1]
+  ttl     = 300
+  records = [local.subdomain_parts[2]]
 }

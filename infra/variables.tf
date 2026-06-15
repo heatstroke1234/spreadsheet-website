@@ -22,28 +22,22 @@ variable "subdomain" {
   default     = "finance"
 }
 
-variable "container_port" {
-  description = "Port the container listens on"
-  type        = number
-  default     = 3000
+variable "github_token" {
+  description = "GitHub fine-grained PAT with Contents read + Webhooks write for this repo"
+  type        = string
+  sensitive   = true
 }
 
-variable "task_cpu" {
-  description = "Fargate task CPU units (256 = 0.25 vCPU)"
-  type        = number
-  default     = 512
+variable "supabase_url" {
+  description = "Supabase project URL (NEXT_PUBLIC_SUPABASE_URL)"
+  type        = string
+  sensitive   = true
 }
 
-variable "task_memory" {
-  description = "Fargate task memory in MiB"
-  type        = number
-  default     = 1024
-}
-
-variable "desired_count" {
-  description = "Number of ECS tasks to run"
-  type        = number
-  default     = 1
+variable "supabase_publishable_key" {
+  description = "Supabase publishable key (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)"
+  type        = string
+  sensitive   = true
 }
 
 locals {
