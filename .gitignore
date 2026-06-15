@@ -44,5 +44,6 @@ next-env.d.ts
 infra/.terraform/
 infra/*.tfstate
 infra/*.tfstate.backup
+infra/*.tfstate.*.backup
 infra/*.tfplan
 infra/tfplan

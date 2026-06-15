@@ -5,7 +5,7 @@ resource "aws_iam_role" "amplify_service" {
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { Service = "amplify.amazonaws.com" }
+      Principal = { Service = ["amplify.amazonaws.com", "amplify.us-east-1.amazonaws.com"] }
       Action    = "sts:AssumeRole"
     }]
   })
@@ -58,6 +58,8 @@ resource "aws_amplify_domain_association" "main" {
     branch_name = aws_amplify_branch.main.branch_name
     prefix      = var.subdomain
   }
+
+  wait_for_verification = false
 
   depends_on = [aws_amplify_branch.main]
 }
