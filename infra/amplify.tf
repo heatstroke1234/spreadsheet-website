@@ -1,4 +1,23 @@
+resource "aws_iam_role" "amplify_service" {
+  name = "${local.name_prefix}-amplify-service"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "amplify.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "amplify_service" {
+  role       = aws_iam_role.amplify_service.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess-Amplify"
+}
+
 resource "aws_amplify_app" "main" {
+  iam_service_role_arn = aws_iam_role.amplify_service.arn
   name        = local.name_prefix
   repository  = "https://github.com/heatstroke1234/spreadsheet-website"
   oauth_token = var.github_token
