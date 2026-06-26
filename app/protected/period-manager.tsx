@@ -98,7 +98,9 @@ export function PeriodManager() {
     if (!periodService) return;
 
     const currentPeriod = periods.find(p => p.id === currentPeriodId);
-    const copiedCards = currentPeriod ? [...currentPeriod.cards] : [];
+    const copiedCards = currentPeriod
+      ? currentPeriod.cards.map(card => ({ ...card, id: crypto.randomUUID() }))
+      : [];
 
     const rolloverTransactions: Period['transactions'] = [];
     let initialBankTotal = 0;
@@ -234,6 +236,73 @@ export function PeriodManager() {
     setDeleteDialogOpen(false);
   }, []);
 
+  const updatePeriodTotals = useCallback(async (
+    periodId: string,
+    totals: { bankTotal?: number; totalSavings?: number }
+  ) => {
+    if (!periodService) return;
+    await periodService.updatePeriodTotals(periodId, totals);
+    setPeriods(prev => prev.map(period =>
+      period.id === periodId ? { ...period, ...totals } : period
+    ));
+  }, [periodService]);
+
+  const createCard = useCallback(async (periodId: string, card: CreditCard): Promise<CreditCard> => {
+    if (!periodService) throw new Error("No period service");
+    const created = await periodService.createCard(periodId, card);
+    setPeriods(prev => prev.map(p =>
+      p.id === periodId ? { ...p, cards: [created, ...p.cards] } : p
+    ));
+    return created;
+  }, [periodService]);
+
+  const updateCard = useCallback(async (cardId: string, card: Partial<CreditCard>): Promise<CreditCard> => {
+    if (!periodService) throw new Error("No period service");
+    const updated = await periodService.updateCard(cardId, card);
+    setPeriods(prev => prev.map(p => ({
+      ...p,
+      cards: p.cards.map(c => c.id === cardId ? { ...c, ...updated } : c),
+    })));
+    return updated;
+  }, [periodService]);
+
+  const deleteCard = useCallback(async (cardId: string): Promise<void> => {
+    if (!periodService) throw new Error("No period service");
+    await periodService.deleteCard(cardId);
+    setPeriods(prev => prev.map(p => ({
+      ...p,
+      cards: p.cards.filter(c => c.id !== cardId),
+    })));
+  }, [periodService]);
+
+  const createTransaction = useCallback(async (periodId: string, tx: Transaction): Promise<Transaction> => {
+    if (!periodService) throw new Error("No period service");
+    const created = await periodService.createTransaction(periodId, tx);
+    setPeriods(prev => prev.map(p =>
+      p.id === periodId ? { ...p, transactions: [created, ...p.transactions] } : p
+    ));
+    return created;
+  }, [periodService]);
+
+  const updateTransaction = useCallback(async (txId: string, tx: Partial<Transaction>): Promise<Transaction> => {
+    if (!periodService) throw new Error("No period service");
+    const updated = await periodService.updateTransaction(txId, tx);
+    setPeriods(prev => prev.map(p => ({
+      ...p,
+      transactions: p.transactions.map(t => t.id === txId ? { ...t, ...updated } : t),
+    })));
+    return updated;
+  }, [periodService]);
+
+  const deleteTransaction = useCallback(async (txId: string): Promise<void> => {
+    if (!periodService) throw new Error("No period service");
+    await periodService.deleteTransaction(txId);
+    setPeriods(prev => prev.map(p => ({
+      ...p,
+      transactions: p.transactions.filter(t => t.id !== txId),
+    })));
+  }, [periodService]);
+
   const currentPeriod = periods.find(p => p.id === currentPeriodId);
   const pendingPeriod = periods.find(p => p.id === pendingPeriodId);
 
@@ -254,13 +323,13 @@ export function PeriodManager() {
         onSwitchPeriod={switchPeriod}
         onUpdatePeriodData={updatePeriodData}
         onDeletePeriod={deletePeriod}
-        createCard={periodService ? ((periodId: string, card: CreditCard) => periodService.createCard(periodId, card)) : undefined}
-        updateCard={periodService ? ((cardId: string, card: Partial<CreditCard>) => periodService.updateCard(cardId, card)) : undefined}
-        deleteCard={periodService ? ((cardId: string) => periodService.deleteCard(cardId)) : undefined}
-        createTransaction={periodService ? ((periodId: string, tx: Transaction) => periodService.createTransaction(periodId, tx)) : undefined}
-        updateTransaction={periodService ? ((txId: string, tx: Partial<Transaction>) => periodService.updateTransaction(txId, tx)) : undefined}
-        deleteTransaction={periodService ? ((txId: string) => periodService.deleteTransaction(txId)) : undefined}
-        updatePeriodTotals={periodService ? ((periodId: string, totals: { bankTotal?: number; totalSavings?: number }) => periodService.updatePeriodTotals(periodId, totals)) : undefined}
+        createCard={periodService ? createCard : undefined}
+        updateCard={periodService ? updateCard : undefined}
+        deleteCard={periodService ? deleteCard : undefined}
+        createTransaction={periodService ? createTransaction : undefined}
+        updateTransaction={periodService ? updateTransaction : undefined}
+        deleteTransaction={periodService ? deleteTransaction : undefined}
+        updatePeriodTotals={periodService ? updatePeriodTotals : undefined}
       />
 
       <Dialog open={switchDialogOpen} onOpenChange={setSwitchDialogOpen}>
