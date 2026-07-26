@@ -102,7 +102,6 @@ export function TransactionManager({
   // Card deletion confirmation state
   const [cardDeleteDialogOpen, setCardDeleteDialogOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<CreditCard | null>(null);
-  const [cardDeleteLoading, setCardDeleteLoading] = useState(false);
 
   // Bank summary dialog state
   const [bankSummaryDialogOpen, setBankSummaryDialogOpen] = useState(false);
@@ -174,6 +173,7 @@ export function TransactionManager({
     addCard,
     startEditCard,
     onCardDialogOpenChange,
+    deleteCard,
     isLoading: cardIsLoading,
     deletingCardIds,
   } = useCardForm({
@@ -187,36 +187,6 @@ export function TransactionManager({
     updateCard,
     deleteCard: deleteCardFn,
   });
-
-  const deleteCard = async (cardId: string) => {
-    setCardDeleteLoading(true);
-    try {
-      // Use granular delete if available
-      if (deleteCardFn) {
-        try {
-          await deleteCardFn(cardId);
-        } catch (error) {
-          console.error("Failed to delete card:", error);
-        }
-      }
-      
-      const updatedCards = cards.filter((card) => card.id !== cardId);
-      const updatedTransactions = transactions.filter((tx) => tx.cardId !== cardId);
-      const updatedVisibleCardIds = { ...visibleCardIds };
-      delete updatedVisibleCardIds[cardId];
-      
-      setCards(updatedCards);
-      setTransactions(updatedTransactions);
-      setVisibleCardIds(updatedVisibleCardIds);
-      updateCurrentPeriodData({ 
-        cards: updatedCards, 
-        transactions: updatedTransactions, 
-        visibleCardIds: updatedVisibleCardIds 
-      });
-    } finally {
-      setCardDeleteLoading(false);
-    }
-  };
 
   const {
     txAmount,
@@ -425,11 +395,11 @@ export function TransactionManager({
       <CardDeleteDialog
         open={cardDeleteDialogOpen}
         cardToDelete={cardToDelete}
-        isLoading={cardDeleteLoading}
+        isLoading={cardToDelete ? deletingCardIds.has(cardToDelete.id) : false}
         onOpenChange={setCardDeleteDialogOpen}
-        onConfirmDelete={() => {
+        onConfirmDelete={async () => {
           if (cardToDelete) {
-            deleteCard(cardToDelete.id);
+            await deleteCard(cardToDelete.id);
           }
           setCardDeleteDialogOpen(false);
           setCardToDelete(null);

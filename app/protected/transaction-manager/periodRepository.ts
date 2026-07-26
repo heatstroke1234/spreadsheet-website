@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CreditCard, Period, Transaction } from "./types";
+import type { CreditCard, Period, PeriodSummary, Transaction } from "./types";
 import type { Database, Inserts, Tables, Updates } from "./supabase.types";
 
 type DbClient = SupabaseClient<Database>;
@@ -428,15 +428,18 @@ async function replaceVisibleCards(
   assertNoError(insertError, "Failed to insert visible card rows");
 }
 
-export async function listPeriods(client: DbClient, userId: string): Promise<Period[]> {
+// Lightweight listing for the period switcher — metadata only, no cards or
+// transactions. Full period data is loaded on demand via getPeriod() for
+// whichever single period is currently active.
+export async function listPeriodSummaries(client: DbClient, userId: string): Promise<PeriodSummary[]> {
   const { data, error } = await client
     .from("periods")
-    .select(PERIOD_SELECT)
+    .select("id, name, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   assertNoError(error, "Failed to fetch periods");
-  return ((data ?? []) as PeriodRecord[]).map(mapPeriod);
+  return (data ?? []).map((row) => ({ id: row.id, name: row.name, createdAt: row.created_at }));
 }
 
 export async function getPeriod(client: DbClient, periodId: string, userId: string): Promise<Period | null> {

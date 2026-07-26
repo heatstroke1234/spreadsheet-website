@@ -6,7 +6,7 @@ type UsePeriodDataParams = {
   onUpdatePeriodData: (
     periodId: string,
     data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
-  ) => void;
+  ) => Promise<void>;
 };
 
 export function usePeriodData({ currentPeriod, onUpdatePeriodData }: UsePeriodDataParams) {
@@ -70,10 +70,11 @@ export function usePeriodData({ currentPeriod, onUpdatePeriodData }: UsePeriodDa
 
   const updateCurrentPeriodData = (
     data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
-  ) => {
+  ): Promise<void> => {
     if (currentPeriod) {
-      onUpdatePeriodData(currentPeriod.id, data);
+      return onUpdatePeriodData(currentPeriod.id, data);
     }
+    return Promise.resolve();
   };
 
   return {

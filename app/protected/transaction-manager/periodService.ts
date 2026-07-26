@@ -1,8 +1,8 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./supabase.types";
-import type { Period, CreditCard, Transaction } from "./types";
+import type { Period, PeriodSummary, CreditCard, Transaction } from "./types";
 import {
-  listPeriods,
+  listPeriodSummaries,
   getPeriod,
   createPeriod as repoCreatePeriod,
   deletePeriod as repoDeletePeriod,
@@ -20,7 +20,7 @@ type DbClient = SupabaseClient<Database>;
 
 export type PeriodService = {
   // Period CRUD
-  listPeriods: () => Promise<Period[]>;
+  listPeriodSummaries: () => Promise<PeriodSummary[]>;
   getPeriod: (periodId: string) => Promise<Period | null>;
   onCreatePeriod: (name: string) => Promise<Period>;
   onSwitchPeriod: (periodId: string) => Promise<Period | null>;
@@ -46,8 +46,8 @@ export type PeriodService = {
 
 export function createPeriodService(client: DbClient, userId: string): PeriodService {
   return {
-    listPeriods: () => listPeriods(client, userId),
-    
+    listPeriodSummaries: () => listPeriodSummaries(client, userId),
+
     getPeriod: (periodId: string) => getPeriod(client, periodId, userId),
     
     onCreatePeriod: async (name: string) => {

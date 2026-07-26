@@ -29,15 +29,24 @@ export type Period = {
   visibleCardIds: Record<string, boolean>;
 };
 
+// Lightweight metadata for periods other than the currently loaded one —
+// enough to populate the period switcher without pulling in every period's
+// cards/transactions.
+export type PeriodSummary = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
 export type TransactionManagerProps = {
-  periods: Period[];
+  periods: PeriodSummary[];
   currentPeriod?: Period;
-  onCreatePeriod: (name: string) => void;
+  onCreatePeriod: (name: string) => Promise<void>;
   onSwitchPeriod: (periodId: string) => void;
   onUpdatePeriodData: (
     periodId: string,
     data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
-  ) => void;
+  ) => Promise<void>;
   onDeletePeriod: (periodId: string) => void;
   // Granular operations for efficient DB updates
   createCard?: (periodId: string, card: CreditCard) => Promise<CreditCard>;

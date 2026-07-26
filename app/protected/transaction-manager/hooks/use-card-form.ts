@@ -3,7 +3,7 @@ import { CreditCard, Period } from "../types";
 
 type UpdatePeriodData = (
   data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
-) => void;
+) => Promise<void>;
 
 type CreateCard = (periodId: string, card: CreditCard) => Promise<CreditCard>;
 type UpdateCard = (cardId: string, card: Partial<CreditCard>) => Promise<CreditCard>;
@@ -91,14 +91,14 @@ export function useCardForm({
               card.id === editingCardId ? { ...card, name: trimmedName, limit: amount, color: cardColor } : card
             );
             setCards(updatedCards);
-            updateCurrentPeriodData({ cards: updatedCards });
+            await updateCurrentPeriodData({ cards: updatedCards });
           }
         } else {
           const updatedCards = cards.map((card) =>
             card.id === editingCardId ? { ...card, name: trimmedName, limit: amount, color: cardColor } : card
           );
           setCards(updatedCards);
-          updateCurrentPeriodData({ cards: updatedCards });
+          await updateCurrentPeriodData({ cards: updatedCards });
         }
         setEditingCardId("");
       } else {
@@ -124,14 +124,14 @@ export function useCardForm({
             setCards(updatedCards);
             const updatedVisibleCardIds = { ...visibleCardIds, [newCard.id]: true };
             setVisibleCardIds(updatedVisibleCardIds);
-            updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
+            await updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
           }
         } else {
           const updatedCards = [newCard, ...cards];
           setCards(updatedCards);
           const updatedVisibleCardIds = { ...visibleCardIds, [newCard.id]: true };
           setVisibleCardIds(updatedVisibleCardIds);
-          updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
+          await updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
         }
       }
 
@@ -157,7 +157,7 @@ export function useCardForm({
           delete updatedVisibleCardIds[cardId];
           setCards(updatedCards);
           setVisibleCardIds(updatedVisibleCardIds);
-          updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
+          await updateCurrentPeriodData({ cards: updatedCards, visibleCardIds: updatedVisibleCardIds });
         }
       }
     } finally {

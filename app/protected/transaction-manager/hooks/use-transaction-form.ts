@@ -3,7 +3,7 @@ import { CreditCard, Period, Transaction } from "../types";
 
 type UpdatePeriodData = (
   data: Partial<Pick<Period, "cards" | "transactions" | "bankTotal" | "totalSavings" | "visibleCardIds">>
-) => void;
+) => Promise<void>;
 
 type CreateTransaction = (periodId: string, transaction: Transaction) => Promise<Transaction>;
 type UpdateTransaction = (transactionId: string, transaction: Partial<Transaction>) => Promise<Transaction>;
@@ -207,14 +207,14 @@ export function useTransactionForm({
           await updatePeriodTotals(periodId, { bankTotal: newBankTotal, totalSavings: newTotalSavings });
         } catch (error) {
           console.error("Failed to update period totals:", error);
-          updateCurrentPeriodData({
+          await updateCurrentPeriodData({
             transactions: updatedTransactions,
             bankTotal: newBankTotal,
             totalSavings: newTotalSavings,
           });
         }
       } else {
-        updateCurrentPeriodData({
+        await updateCurrentPeriodData({
           transactions: updatedTransactions,
           bankTotal: newBankTotal,
           totalSavings: newTotalSavings,
@@ -277,7 +277,7 @@ export function useTransactionForm({
           setTransactions(updatedTransactions);
           setBankTotal(newBankTotal);
           setTotalSavings(newTotalSavings);
-          updateCurrentPeriodData({
+          await updateCurrentPeriodData({
             transactions: updatedTransactions,
             bankTotal: newBankTotal,
             totalSavings: newTotalSavings,

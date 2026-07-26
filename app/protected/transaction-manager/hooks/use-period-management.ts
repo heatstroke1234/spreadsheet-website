@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 
 type UsePeriodManagementParams = {
-  onCreatePeriod: (name: string) => void;
+  onCreatePeriod: (name: string) => Promise<void>;
   onSwitchPeriod: (periodId: string) => void;
   onDeletePeriod: (periodId: string) => void;
   setTxPage: (page: number) => void;
@@ -19,13 +19,13 @@ export function usePeriodManagement({
 
   const handleCreatePeriod = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!newPeriodName.trim()) return;
+
     setIsLoading(true);
     try {
-      if (newPeriodName.trim()) {
-        onCreatePeriod(newPeriodName.trim());
-        setNewPeriodName("");
-        setPeriodDialogOpen(false);
-      }
+      await onCreatePeriod(newPeriodName.trim());
+      setNewPeriodName("");
+      setPeriodDialogOpen(false);
     } finally {
       setIsLoading(false);
     }
