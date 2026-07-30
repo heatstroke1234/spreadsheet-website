@@ -6,10 +6,12 @@ A personal finance tracking app for managing transactions across billing periods
 
 - **Periods** — organise finances into time-boxed periods (e.g. monthly). Creating a new period copies your credit cards forward and rolls over the current bank balance automatically.
 - **Transactions** — log debit, credit card, and bank transactions with categories (necessary / recreation) and descriptions.
-- **Credit cards** — manage multiple cards per period with custom names, limits, and colours.
+- **Credit cards** — manage multiple cards per period with custom names, limits, and colors.
 - **Bank summary** — track deposits, transfers, salary, and savings within each period.
 - **Filtering & search** — filter by method, search across description/amount/date, and paginate results.
-- **AI chat assistant** — a slide-out chat panel that answers questions about your spending, savings, and trends across *all* periods (not just the one you're viewing), backed by Claude with tool-calling over your real transaction data.
+- **AI chat assistant** — a slide-out chat panel that answers questions about your spending, savings, and trends across *all* periods (not just the one you're viewing), backed by Claude with tool-calling over your real transaction data. Pick a specific model (Opus 5, Sonnet 5, Haiku 4.5) from the dropdown, or leave it on **Auto** to have each question routed to whichever model fits it best. Clear the conversation anytime with the trash icon in the panel header.
+
+> **Note:** Responses stream in token-by-token during local development. On the deployed (AWS Amplify) production site, streaming isn't supported by Amplify's Next.js compute runtime — the full response arrives at once after a short loading delay instead of appearing progressively.
 
 ## Stack
 
