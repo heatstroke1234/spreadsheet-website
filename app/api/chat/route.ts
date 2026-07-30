@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createPeriodService } from "@/app/protected/transaction-manager/periodService";
 import { buildChatTools } from "./tools";
 import { buildSystemPrompt } from "./prompt";
+import { CHAT_MODELS, DEFAULT_CHAT_MODEL_SELECTION, classifyModel, isChatModelSelection } from "./models";
 import type { ChatRequestBody, ChatStreamEvent } from "./types";
 
 export async function POST(request: Request) {
@@ -34,16 +35,26 @@ export async function POST(request: Request) {
     });
   }
 
+  // Never trust the client's model string directly — validate against the allow-list so
+  // an arbitrary/unsupported model id (or selection) can't be smuggled into the request.
+  const selection = isChatModelSelection(body.model) ? body.model : DEFAULT_CHAT_MODEL_SELECTION;
+  const lastUserMessage = [...body.messages].reverse().find((m) => m.role === "user");
+  const model = selection === "auto" ? classifyModel(lastUserMessage?.content ?? "") : selection;
+  const modelConfig = CHAT_MODELS.find((m) => m.id === model)!;
+
   const periodService = createPeriodService(supabase, userId);
   const tools = buildChatTools(periodService);
   const system = buildSystemPrompt(body.currentPeriodId);
 
   const client = new Anthropic();
   const runner = client.beta.messages.toolRunner({
-    model: "claude-opus-5",
+    model,
     max_tokens: 8000,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "medium" },
+    // Haiku 4.5 doesn't support adaptive thinking / output_config.effort — sending
+    // either would 400. Only attach them for models known to support them.
+    ...(modelConfig.supportsAdaptiveThinking
+      ? { thinking: { type: "adaptive" as const }, output_config: { effort: "medium" as const } }
+      : {}),
     system,
     tools,
     messages: body.messages,
@@ -58,6 +69,8 @@ export async function POST(request: Request) {
       };
 
       try {
+        send({ type: "model_selected", model });
+
         let firstTurn = true;
         for await (const messageStream of runner) {
           // Each iteration is a separate API turn (the tool runner re-calls Claude after

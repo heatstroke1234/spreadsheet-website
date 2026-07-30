@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MessageCircle, LoaderCircle, Search } from "lucide-react";
+import { MessageCircle, LoaderCircle, Search, Trash2, ChevronDown } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -11,19 +11,44 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useChat } from "./use-chat";
 import { ChatMarkdown } from "./chat-markdown";
+import { CHAT_MODELS, type ChatModelSelection } from "@/app/api/chat/models";
+
+const MODEL_OPTIONS: { id: ChatModelSelection; label: string; description: string }[] = [
+  { id: "auto", label: "Auto", description: "Automatically picks the best model for your question" },
+  ...CHAT_MODELS,
+];
 
 type ChatPanelProps = {
   currentPeriodId?: string;
 };
 
 export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
-  const { messages, input, setInput, isStreaming, activeTool, error, sendMessage, cancel } =
-    useChat(currentPeriodId);
+  const {
+    messages,
+    input,
+    setInput,
+    isStreaming,
+    activeTool,
+    error,
+    sendMessage,
+    cancel,
+    clearChat,
+    modelSelection,
+    setModelSelection,
+  } = useChat(currentPeriodId);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const currentOption = MODEL_OPTIONS.find((m) => m.id === modelSelection)!;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -43,7 +68,18 @@ export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
 
       <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Finance Assistant</SheetTitle>
+          <div className="flex items-center justify-between pr-8">
+            <SheetTitle>Finance Assistant</SheetTitle>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={clearChat}
+              disabled={messages.length === 0}
+              aria-label="Clear chat"
+            >
+              <Trash2 />
+            </Button>
+          </div>
           <SheetDescription>
             Ask about your spending, savings, or trends across any period.
           </SheetDescription>
@@ -60,8 +96,13 @@ export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
           {messages.map((message, i) => (
             <div
               key={i}
-              className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
+              className={message.role === "user" ? "flex justify-end" : "flex flex-col items-start"}
             >
+              {message.role === "assistant" && message.modelUsed && (
+                <span className="mb-1 pl-3 text-[11px] text-muted-foreground">
+                  Answered by {CHAT_MODELS.find((m) => m.id === message.modelUsed)?.label}
+                </span>
+              )}
               <div
                 className={
                   message.role === "user"
@@ -78,6 +119,16 @@ export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
             </div>
           ))}
 
+          {isStreaming && !activeTool && messages[messages.length - 1]?.role !== "assistant" && (
+            <div className="flex justify-start">
+              <div className="flex items-center gap-1 rounded-lg bg-muted px-3 py-2.5">
+                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
+              </div>
+            </div>
+          )}
+
           {activeTool && (
             <div className="mt-2 mb-1 flex items-center gap-1.5 pl-3 text-xs text-muted-foreground">
               <Search className="size-3.5 animate-pulse" />
@@ -89,6 +140,35 @@ export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
         </div>
 
         <SheetFooter>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mr-auto text-xs text-muted-foreground"
+                disabled={isStreaming}
+              >
+                {currentOption.label}
+                <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuRadioGroup
+                value={modelSelection}
+                onValueChange={(value) => setModelSelection(value as ChatModelSelection)}
+              >
+                {MODEL_OPTIONS.map((m) => (
+                  <DropdownMenuRadioItem key={m.id} value={m.id}>
+                    <div className="flex flex-col py-0.5">
+                      <span>{m.label}</span>
+                      <span className="text-xs text-muted-foreground">{m.description}</span>
+                    </div>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <form
             className="flex w-full items-center gap-2"
             onSubmit={(e) => {

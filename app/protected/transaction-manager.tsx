@@ -32,6 +32,7 @@ import {
   TxSortOrder,
 } from "./transaction-manager/calculations";
 import { LogoutButton } from '@/components/logout-button'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 function generateCSV(transactions: Transaction[], cards: { id: string; name: string }[]): string {
   const headers = [
@@ -301,6 +302,7 @@ export function TransactionManager({
               onTxCardIdChange={setTxCardId}
             />
 
+            <ThemeToggle />
             <LogoutButton />
           </div>
         </div>
