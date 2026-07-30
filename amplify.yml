@@ -7,6 +7,11 @@ frontend:
         - npm ci
     build:
       commands:
+        # Amplify only exposes App-level environment variables to the build process by
+        # default — Next.js server code (Route Handlers, Server Actions) doesn't see them
+        # at runtime unless they're written into .env.production before the build, per
+        # https://docs.aws.amazon.com/amplify/latest/userguide/ssr-environment-variables.html
+        - env | grep -e ANTHROPIC_API_KEY >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next

@@ -73,3 +73,5 @@ terraform apply
 ```
 
 Amplify reads `amplify.yml` from the repo root for the build spec and the environment variables set in `infra/amplify.tf` are injected at build time.
+
+⚠️ Amplify only exposes environment variables to the *build* process by default — Next.js server code (Route Handlers) won't see them at runtime unless they're also written into `.env.production` during the build. `amplify.yml` already does this for `ANTHROPIC_API_KEY`; any new server-only env var needs the same line added, or it'll work locally but fail silently in production. See `CLAUDE.md` for details.

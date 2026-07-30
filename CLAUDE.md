@@ -122,3 +122,7 @@ terraform apply
 
 ### CI/CD
 Pushing to `main` triggers Amplify's built-in webhook — no GitHub Actions workflow needed. Amplify reads `amplify.yml` from the repo root and injects the environment variables set in `infra/amplify.tf` at build time.
+
+⚠️ **Amplify only exposes App-level environment variables to the build process, not to the SSR runtime** — a Next.js Route Handler reading `process.env.SOMETHING` at request time will see it as `undefined` even though it's correctly set in `infra/amplify.tf`/the console, unless it's also written into `.env.production` during the build (`amplify.yml`'s `build.commands`) — see [AWS's docs on this](https://docs.aws.amazon.com/amplify/latest/userguide/ssr-environment-variables.html). This is already done for `ANTHROPIC_API_KEY` in `amplify.yml`; **any new server-only env var added in the future needs the same treatment** or it'll silently fail in production with an error like "Could not resolve authentication method" while working fine locally. (This doesn't affect `NEXT_PUBLIC_*` vars, which are already inlined into the client bundle at build time, or Docker deployments, where `docker run -e` sets a real OS-level env var with no such gotcha.)
+
+Note: writing a secret into `.env.production` means it ends up in Amplify's build artifacts, readable by anyone with deploy-artifact access — acceptable here since this is a single-user personal app, but worth knowing before doing the same for a more sensitive credential.
