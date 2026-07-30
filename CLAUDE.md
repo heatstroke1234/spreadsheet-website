@@ -18,6 +18,7 @@ npm run lint     # Run ESLint
 Required in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — note: this project uses "publishable key", not the typical "anon key" name
+- `ANTHROPIC_API_KEY` — server-only (no `NEXT_PUBLIC_` prefix), used by the chat Route Handler (`app/api/chat/route.ts`) to call Claude
 
 ## Architecture
 
@@ -68,6 +69,23 @@ page.tsx
 ### Period lifecycle
 Creating a new period copies cards from the current period and auto-generates a rollover bank transaction if `bankTotal > 0`.
 
+### AI chat assistant
+A slide-out chat panel (`app/protected/chat/`) lets the user ask questions about their finances across *all* periods, not just the currently loaded one.
+
+| File | Role |
+|------|------|
+| `app/api/chat/route.ts` | POST-only Route Handler; authenticates via `getClaims()`, builds a `periodService` bound to the authenticated user, runs Claude's Tool Runner, streams NDJSON events back |
+| `app/api/chat/tools.ts` | `betaZodTool` definitions (`list_periods`, `get_period_summary`, `search_transactions`) — thin wrappers around `periodService`, so ownership checks in `periodRepository.ts` are inherited automatically |
+| `app/api/chat/prompt.ts` | System prompt builder |
+| `app/api/chat/types.ts` | Shared request/stream-event types (type-only) |
+| `app/protected/chat/use-chat.ts` | Client hook: message state, streaming fetch/NDJSON parsing |
+| `app/protected/chat/chat-panel.tsx` | The `Sheet`-based UI, rendered as a sibling of `TransactionManager` in `period-manager.tsx` |
+| `app/protected/chat/chat-markdown.tsx` | Renders assistant messages as markdown (tables, lists, code, etc. via `react-markdown` + `remark-gfm`); user messages render as plain text |
+
+Model: `claude-opus-5` via `@anthropic-ai/sdk` (new deps: `@anthropic-ai/sdk`, `zod`, `react-markdown`, `remark-gfm`). The system prompt (`prompt.ts`) scopes the assistant to this app's financial data and tells it to redirect rather than answer unrelated questions. The chatbot never receives raw transaction arrays for aggregate questions — tools return pre-aggregated summaries (via the existing `summaryRows`/`calculations.ts`) to keep token usage down; `search_transactions` is the only tool that returns line items, capped at a `limit`.
+
+**Multi-turn streaming gotcha:** the tool runner makes one API call per turn (commentary → tool call → tool result → next turn), and `route.ts` emits a `turn_break` event between turns so the client (`use-chat.ts`) knows to insert a paragraph break rather than concatenating two turns' text with no space. That break-insertion logic **must stay outside** any `setMessages(prev => ...)` updater — React Strict Mode (on by default in this app's dev mode) invokes updater functions twice to check purity, and mutating a ref *inside* the updater causes the second (committed) call to see the ref already cleared by the first. Read/clear the ref before calling `setMessages`, not inside it.
+
 ## Docker
 
 A `Dockerfile` exists for local or self-hosted production runs. It uses the Next.js standalone output, so `output: 'standalone'` must be present in `next.config.ts` when building the image. Remove it again before pushing to `main` — Amplify does not use the standalone bundle and it breaks routing.
@@ -78,8 +96,10 @@ docker build \
   --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... \
   -t spreadsheet-website .
 
-docker run -p 3000:3000 spreadsheet-website
+docker run -p 3000:3000 -e ANTHROPIC_API_KEY=... spreadsheet-website
 ```
+
+`NEXT_PUBLIC_*` vars are `--build-arg`s because they get inlined into the client bundle at build time. `ANTHROPIC_API_KEY` is server-only and read at request time by the chat Route Handler, so it's passed to `docker run` instead — never bake it into the image as a build arg.
 
 ## Infrastructure & Deployment
 
@@ -96,6 +116,7 @@ terraform init
 export TF_VAR_github_token="ghp_..."                    # classic GitHub PAT — fine-grained PATs do NOT work with Amplify oauth_token
 export TF_VAR_supabase_url="https://..."
 export TF_VAR_supabase_publishable_key="sb_publishable_..."
+export TF_VAR_anthropic_api_key="sk-ant-..."
 terraform apply
 ```
 

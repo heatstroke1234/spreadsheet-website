@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { LoaderCircle } from "lucide-react";
 import { TransactionManager } from "./transaction-manager";
+import { ChatPanel } from "./chat/chat-panel";
 import { createClient } from "@/lib/supabase/client";
 import { createPeriodService } from "./transaction-manager/periodService";
 import type { CreditCard, Period, PeriodSummary, Transaction } from "./transaction-manager/types";
@@ -303,6 +304,8 @@ export function PeriodManager() {
         deleteTransaction={periodService ? deleteTransaction : undefined}
         updatePeriodTotals={periodService ? updatePeriodTotals : undefined}
       />
+
+      <ChatPanel currentPeriodId={currentPeriod?.id} />
 
       <Dialog open={switchDialogOpen} onOpenChange={setSwitchDialogOpen}>
         <DialogContent>

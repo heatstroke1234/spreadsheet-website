@@ -40,6 +40,12 @@ variable "supabase_publishable_key" {
   sensitive   = true
 }
 
+variable "anthropic_api_key" {
+  description = "Anthropic API key (ANTHROPIC_API_KEY) — server-only, used by the chat Route Handler"
+  type        = string
+  sensitive   = true
+}
+
 locals {
   fqdn        = "${var.subdomain}.${var.domain}"
   name_prefix = var.app_name

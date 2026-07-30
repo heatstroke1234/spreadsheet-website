@@ -31,6 +31,7 @@ resource "aws_amplify_app" "main" {
   environment_variables = {
     NEXT_PUBLIC_SUPABASE_URL             = var.supabase_url
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = var.supabase_publishable_key
+    ANTHROPIC_API_KEY                    = var.anthropic_api_key
   }
 
   enable_branch_auto_build    = false
