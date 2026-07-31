@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MessageCircle, LoaderCircle, Search, Trash2, ChevronDown } from "lucide-react";
+import { MessageCircle, LoaderCircle, Search, Globe, Trash2, ChevronDown } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -28,6 +28,11 @@ const MODEL_OPTIONS: { id: ChatModelSelection; label: string; description: strin
   { id: "auto", label: "Auto", description: "Automatically picks the best model for your question" },
   ...CHAT_MODELS,
 ];
+
+function toolStatusLabel(tool: string): string {
+  if (tool === "web_search") return "Searching the web";
+  return `Looking up ${tool.replace(/_/g, " ")}`;
+}
 
 type ChatPanelProps = {
   currentPeriodId?: string;
@@ -81,16 +86,21 @@ export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
             </Button>
           </div>
           <SheetDescription>
-            Ask about your spending, savings, or trends across any period.
+            Ask about your spending, cards, and savings, or general finance questions.
           </SheetDescription>
         </SheetHeader>
 
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4">
           {messages.length === 0 && (
-            <p className="pt-8 text-center text-sm text-muted-foreground">
-              Try asking &quot;How much did I spend on recreation this period?&quot; or &quot;Compare my
-              card spend across all periods.&quot;
-            </p>
+            <div className="space-y-2 pt-8 text-center text-sm text-muted-foreground">
+              <p>Try asking:</p>
+              <ul className="space-y-1">
+                <li>&quot;How much did I spend on recreation this period?&quot;</li>
+                <li>&quot;Which card is closest to its limit?&quot;</li>
+                <li>&quot;Find every Amazon purchase, anywhere.&quot;</li>
+                <li>&quot;What&apos;s a typical emergency fund size?&quot;</li>
+              </ul>
+            </div>
           )}
 
           {messages.map((message, i) => (
@@ -129,12 +139,16 @@ export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
             </div>
           )}
 
-          {activeTool && (
-            <div className="mt-2 mb-1 flex items-center gap-1.5 pl-3 text-xs text-muted-foreground">
-              <Search className="size-3.5 animate-pulse" />
-              Looking up {activeTool.replace(/_/g, " ")}…
-            </div>
-          )}
+          {activeTool &&
+            (() => {
+              const ToolIcon = activeTool === "web_search" ? Globe : Search;
+              return (
+                <div className="mt-2 mb-1 flex items-center gap-1.5 pl-3 text-xs text-muted-foreground">
+                  <ToolIcon className="size-3.5 animate-pulse" />
+                  {toolStatusLabel(activeTool)}…
+                </div>
+              );
+            })()}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>

@@ -1,24 +1,28 @@
 # Financials Management
 
-A personal finance tracking app for managing transactions across billing periods. Track debit spending, credit card usage, and bank deposits — with per-period summaries and savings tracking.
+A personal finance tracking app for managing transactions across billing periods. Track debit spending, credit card usage, and bank deposits — with per-period summaries, savings tracking, and an AI assistant to help you make sense of it all.
 
 ## Features
 
-- **Periods** — organise finances into time-boxed periods (e.g. monthly). Creating a new period copies your credit cards forward and rolls over the current bank balance automatically.
+- **Periods** — organize finances into time-boxed periods (e.g. monthly). Creating a new period copies your credit cards forward and rolls over the current bank balance automatically.
 - **Transactions** — log debit, credit card, and bank transactions with categories (necessary / recreation) and descriptions.
 - **Credit cards** — manage multiple cards per period with custom names, limits, and colors.
 - **Bank summary** — track deposits, transfers, salary, and savings within each period.
 - **Filtering & search** — filter by method, search across description/amount/date, and paginate results.
-- **AI chat assistant** — a slide-out chat panel that answers questions about your spending, savings, and trends across *all* periods (not just the one you're viewing), backed by Claude with tool-calling over your real transaction data. Pick a specific model (Opus 5, Sonnet 5, Haiku 4.5) from the dropdown, or leave it on **Auto** to have each question routed to whichever model fits it best. Clear the conversation anytime with the trash icon in the panel header.
-
-> **Note:** Responses stream in token-by-token during local development. On the deployed (AWS Amplify) production site, streaming isn't supported by Amplify's Next.js compute runtime — the full response arrives at once after a short loading delay instead of appearing progressively.
+- **AI chat assistant** — a slide-out chat panel, powered by Claude, that answers questions about your finances:
+  - Spending, savings, and trends across *all* periods, not just the one you're viewing.
+  - Per-card spend, remaining balance, and utilization (e.g. "which card is closest to its limit?").
+  - Line-item search either within one period or across every period at once (e.g. "find every Amazon purchase, anywhere").
+  - General personal-finance knowledge via web search (savings rate benchmarks, budgeting rules of thumb, current rate context) alongside your own numbers.
+  - A model picker — choose Opus 5, Sonnet 5, or Haiku 4.5, or leave it on **Auto** to have each question routed to whichever fits it best.
+  - Clear the conversation anytime with the trash icon in the panel header.
 
 ## Stack
 
 - [Next.js 16](https://nextjs.org) (App Router)
 - [Supabase](https://supabase.com) — auth + Postgres database
 - [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com)
-- [Claude API](https://platform.claude.com) via `@anthropic-ai/sdk` — powers the chat assistant (tool-calling, streaming)
+- [Claude API](https://platform.claude.com) via `@anthropic-ai/sdk` — powers the chat assistant (tool-calling, web search, streaming)
 - React 19, TypeScript
 
 ## Getting Started
@@ -42,38 +46,22 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the login page if unauthenticated.
 
-### Production (Docker — local/self-hosted)
+### Production
 
-The `Dockerfile` builds a standalone image using Node 20 Alpine. It requires `output: 'standalone'` in `next.config.ts` (remove it when deploying to Amplify — Amplify doesn't use the standalone bundle).
+Two supported paths — see `CLAUDE.md` for deployment internals:
 
-```bash
-# Add output: 'standalone' to next.config.ts first
-docker build \
-  --build-arg NEXT_PUBLIC_SUPABASE_URL=... \
-  --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... \
-  -t financials-management .
-
-docker run -p 3000:3000 -e ANTHROPIC_API_KEY=... financials-management
-```
-
-`NEXT_PUBLIC_*` vars must be build args (they're inlined into the client bundle at build time). `ANTHROPIC_API_KEY` is server-only and only read at request time, so it's passed at `docker run` instead.
-
-### Production (AWS Amplify — automated)
-
-Pushes to `main` automatically trigger an Amplify build and deploy. The app is served over HTTPS at `finance.nikhilv.net` via Amplify's CloudFront distribution.
-
-The AWS infrastructure (Amplify app + branch, IAM service role, Route 53 records) is managed with Terraform in `infra/`. To provision from scratch:
-
-```bash
-cd infra
-terraform init
-export TF_VAR_github_token="ghp_..."                    # classic GitHub PAT (repo scope)
-export TF_VAR_supabase_url="https://..."
-export TF_VAR_supabase_publishable_key="sb_publishable_..."
-export TF_VAR_anthropic_api_key="sk-ant-..."
-terraform apply
-```
-
-Amplify reads `amplify.yml` from the repo root for the build spec and the environment variables set in `infra/amplify.tf` are injected at build time.
-
-⚠️ Amplify only exposes environment variables to the *build* process by default — Next.js server code (Route Handlers) won't see them at runtime unless they're also written into `.env.production` during the build. `amplify.yml` already does this for `ANTHROPIC_API_KEY`; any new server-only env var needs the same line added, or it'll work locally but fail silently in production. See `CLAUDE.md` for details.
+- **Docker (local/self-hosted):** builds a standalone image via the included `Dockerfile`.
+  ```bash
+  docker build --build-arg NEXT_PUBLIC_SUPABASE_URL=... --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... -t financials-management .
+  docker run -p 3000:3000 -e ANTHROPIC_API_KEY=... financials-management
+  ```
+- **AWS Amplify (automated):** pushes to `main` deploy automatically to `finance.nikhilv.net`. Infrastructure (Amplify app, IAM, Route 53) is managed with Terraform in `infra/`:
+  ```bash
+  cd infra
+  terraform init
+  export TF_VAR_github_token="ghp_..."
+  export TF_VAR_supabase_url="https://..."
+  export TF_VAR_supabase_publishable_key="sb_publishable_..."
+  export TF_VAR_anthropic_api_key="sk-ant-..."
+  terraform apply
+  ```

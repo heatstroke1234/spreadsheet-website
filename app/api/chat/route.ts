@@ -56,7 +56,18 @@ export async function POST(request: Request) {
       ? { thinking: { type: "adaptive" as const }, output_config: { effort: "medium" as const } }
       : {}),
     system,
-    tools,
+    // Dynamic filtering (web_search_20260318) improves result accuracy/token efficiency
+    // but isn't documented as supported on Haiku 4.5 — fall back to the basic
+    // web_search_20250305 variant there. Anthropic runs the search server-side either
+    // way; capped at 3 uses per message to bound cost/latency for a single question.
+    tools: [
+      ...tools,
+      {
+        type: modelConfig.supportsDynamicWebSearch ? ("web_search_20260318" as const) : ("web_search_20250305" as const),
+        name: "web_search" as const,
+        max_uses: 3,
+      },
+    ],
     messages: body.messages,
     stream: true,
   });
@@ -83,7 +94,12 @@ export async function POST(request: Request) {
           firstTurn = false;
 
           for await (const event of messageStream) {
-            if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
+            if (
+              event.type === "content_block_start" &&
+              (event.content_block.type === "tool_use" || event.content_block.type === "server_tool_use")
+            ) {
+              // server_tool_use covers Anthropic-hosted tools like web_search, which run
+              // server-side rather than through our own tool-runner dispatch.
               send({ type: "tool_start", name: event.content_block.name });
             } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
               send({ type: "text_delta", text: event.delta.text });
