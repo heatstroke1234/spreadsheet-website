@@ -81,6 +81,11 @@ export function useTransactionForm({
       return;
     }
 
+    if (txMethod === "card" && !txCardId) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const card = cards.find((item) => item.id === txCardId);
       const cardNameForTx =

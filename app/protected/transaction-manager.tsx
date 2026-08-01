@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -90,6 +91,7 @@ export function TransactionManager({
   updateTransaction,
   deleteTransaction: deleteTransactionFn,
   updatePeriodTotals,
+  onOpenChat,
 }: Omit<TransactionManagerProps, 'onLogout'>) {
   const [showDebit, setShowDebit] = useState(true);
   const [showBank, setShowBank] = useState(true);
@@ -302,6 +304,15 @@ export function TransactionManager({
               onTxCardIdChange={setTxCardId}
             />
 
+            <Button
+              variant="outline"
+              size="icon"
+              className="lg:hidden"
+              onClick={onOpenChat}
+              aria-label="Open finance assistant"
+            >
+              <MessageCircle className="size-4" />
+            </Button>
             <ThemeToggle />
             <LogoutButton />
           </div>

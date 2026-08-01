@@ -1,6 +1,16 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { LoaderCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ChevronDown, LoaderCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -105,15 +115,17 @@ export function TransactionsPanel({
         </div>
 
         <div className="flex w-full items-center gap-2 md:w-auto">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={onDownloadCSV}
             disabled={filteredTransactions.length === 0}
-            className="shrink-0 rounded border border-zinc-300 bg-zinc-100 px-2 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+            className="shrink-0"
           >
             CSV
-          </button>
-          <input
+          </Button>
+          <Input
             id="txSearch"
             value={txSearch}
             onChange={(e) => {
@@ -121,36 +133,51 @@ export function TransactionsPanel({
               onSetTxPage(1);
             }}
             placeholder="Search transactions"
-            className="w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Checkbox
+              id="showDebit"
               checked={showDebit}
               onCheckedChange={(checked) => {
                 onSetShowDebit(Boolean(checked));
                 onSetTxPage(1);
               }}
             />
-            <label className="text-sm text-zinc-700 dark:text-zinc-300">Debit</label>
+            <Label htmlFor="showDebit" className="font-normal text-zinc-700 dark:text-zinc-300">
+              Debit
+            </Label>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Checkbox
+              id="showBank"
               checked={showBank}
               onCheckedChange={(checked) => {
                 onSetShowBank(Boolean(checked));
                 onSetTxPage(1);
               }}
             />
-            <label className="text-sm text-zinc-700 dark:text-zinc-300">Bank</label>
+            <Label htmlFor="showBank" className="font-normal text-zinc-700 dark:text-zinc-300">
+              Bank
+            </Label>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
+              <Button variant="outline" size="sm" className="gap-1.5">
                 Credit cards
-              </button>
+                {cards.length > 0 &&
+                  (() => {
+                    const selectedCount = cards.filter((card) => visibleCardIds[card.id] ?? true).length;
+                    return selectedCount < cards.length ? (
+                      <Badge variant="secondary" className="px-1.5">
+                        {selectedCount}/{cards.length}
+                      </Badge>
+                    ) : null;
+                  })()}
+                <ChevronDown className="size-3.5 opacity-60" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {cards.length === 0 ? (
@@ -175,56 +202,64 @@ export function TransactionsPanel({
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
           <div className="flex items-center gap-2">
-            <label htmlFor="txSortBy" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <Label htmlFor="txSortBy" className="text-zinc-700 dark:text-zinc-300">
               Sort by
-            </label>
-            <select
-              id="txSortBy"
+            </Label>
+            <Select
               value={txSortBy}
-              onChange={(e) => {
-                onSetSortBy(e.target.value as TxSortBy);
+              onValueChange={(value) => {
+                onSetSortBy(value as TxSortBy);
                 onSetTxPage(1);
               }}
-              className="rounded border p-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             >
-              <option value="date">Date</option>
-              <option value="amount">Amount</option>
-              <option value="method">Method</option>
-            </select>
-            <select
-              id="txSortOrder"
+              <SelectTrigger id="txSortBy" size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Date</SelectItem>
+                <SelectItem value="amount">Amount</SelectItem>
+                <SelectItem value="method">Method</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
               value={txSortOrder}
-              onChange={(e) => {
-                onSetSortOrder(e.target.value as TxSortOrder);
+              onValueChange={(value) => {
+                onSetSortOrder(value as TxSortOrder);
                 onSetTxPage(1);
               }}
-              className="rounded border p-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             >
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
-            </select>
+              <SelectTrigger id="txSortOrder" size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Desc</SelectItem>
+                <SelectItem value="asc">Asc</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center justify-between sm:hidden">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={effectiveTxPage <= 1}
               onClick={() => { if (effectiveTxPage > 1) onSetTxPage((prev) => Math.max(1, prev - 1)); }}
-              className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
             >
               ← Prev
-            </button>
+            </Button>
             <span className="text-sm text-zinc-600 dark:text-zinc-300">
               Page {effectiveTxPage} of {totalPages}
             </span>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={effectiveTxPage >= totalPages}
               onClick={() => { if (effectiveTxPage < totalPages) onSetTxPage((prev) => Math.min(totalPages, prev + 1)); }}
-              className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
             >
               Next →
-            </button>
+            </Button>
           </div>
 
           <div className="hidden sm:block">
@@ -284,6 +319,11 @@ export function TransactionsPanel({
             const txCard = tx.method === "card" ? cards.find((card) => card.id === tx.cardId) : undefined;
             const txBorderColor = txCard?.color ?? "";
             const txCategoryLabel = tx.category === "recreation" ? "Recreation" : "Necessary";
+            const isIncome = tx.method === "bank";
+            const amountColorClass = isIncome
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-zinc-900 dark:text-zinc-100";
+            const amountText = `${isIncome ? "+" : "-"}$${tx.amount.toFixed(2)}`;
 
             return (
               <li
@@ -315,8 +355,8 @@ export function TransactionsPanel({
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <p className="cursor-default text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                              ${tx.amount.toFixed(2)}
+                            <p className={`cursor-default text-lg font-bold ${amountColorClass}`}>
+                              {amountText}
                             </p>
                           </TooltipTrigger>
                           <TooltipContent side="left">
@@ -325,25 +365,27 @@ export function TransactionsPanel({
                         </Tooltip>
                       </TooltipProvider>
                     ) : (
-                      <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">${tx.amount.toFixed(2)}</p>
+                      <p className={`text-lg font-bold ${amountColorClass}`}>{amountText}</p>
                     )}
                     <div className="mt-2 flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
+                        size="xs"
                         onClick={() => onEditTransaction(tx)}
-                        className="rounded bg-white px-2 py-1 text-xs font-medium text-zinc-900"
+                        className="bg-white text-zinc-900 hover:bg-zinc-100"
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        size="xs"
                         onClick={() => onDeleteTransaction(tx.id)}
                         disabled={deletingTxIds.has(tx.id)}
-                        className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1"
+                        className="bg-red-500 text-white hover:bg-red-600"
                       >
                         {deletingTxIds.has(tx.id) && <LoaderCircle className="h-3 w-3 animate-spin" />}
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>

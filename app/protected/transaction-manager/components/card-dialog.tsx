@@ -11,6 +11,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type CardDialogProps = {
   open: boolean;
@@ -57,39 +59,31 @@ export function CardDialog({
 
         <form className="mt-4 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="newCardName">
-              Card name
-            </label>
-            <input
+            <Label htmlFor="newCardName">Card name</Label>
+            <Input
               id="newCardName"
               value={cardName}
               onChange={(e) => onCardNameChange(e.target.value)}
-              className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               required
               disabled={isLoading}
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="newCardLimit">
-              Limit
-            </label>
-            <input
+            <Label htmlFor="newCardLimit">Limit</Label>
+            <Input
               id="newCardLimit"
               type="number"
               min={1}
               value={cardLimit}
               onChange={(e) => onCardLimitChange(e.target.value)}
-              className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               required
               disabled={isLoading}
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="newCardColor">
-              Color
-            </label>
+            <Label htmlFor="newCardColor">Color</Label>
             <input
               id="newCardColor"
               type="color"

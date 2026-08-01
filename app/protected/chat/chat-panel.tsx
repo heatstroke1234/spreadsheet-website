@@ -36,9 +36,11 @@ function toolStatusLabel(tool: string): string {
 
 type ChatPanelProps = {
   currentPeriodId?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 };
 
-export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
+export function ChatPanel({ currentPeriodId, open, onOpenChange }: ChatPanelProps) {
   const {
     messages,
     input,
@@ -60,11 +62,17 @@ export function ChatPanel({ currentPeriodId }: ChatPanelProps) {
   }, [messages, activeTool]);
 
   return (
-    <Sheet onOpenChange={(open) => !open && cancel()}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (!next) cancel();
+      }}
+    >
       <SheetTrigger asChild>
         <Button
           size="icon-lg"
-          className="fixed right-6 bottom-6 z-40 size-14 rounded-full shadow-lg"
+          className="fixed right-6 bottom-6 z-40 hidden size-14 rounded-full shadow-lg lg:inline-flex"
           aria-label="Open finance assistant"
         >
           <MessageCircle className="size-6" />

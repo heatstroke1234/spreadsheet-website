@@ -92,24 +92,30 @@ export function BankCardsPanel({
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <button
+                    <Button
                       type="button"
+                      size="xs"
                       onClick={() => onEditCard(card)}
                       disabled={deletingCardIds.has(card.id)}
-                      className="rounded bg-white px-2 py-1 text-xs font-medium text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="bg-white text-zinc-900 hover:bg-zinc-100"
                     >
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      size="xs"
                       onClick={() => onRequestDeleteCard(card)}
                       disabled={hasTransactions || deletingCardIds.has(card.id)}
-                      className="rounded bg-red-500 px-2 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1"
+                      className={
+                        hasTransactions || deletingCardIds.has(card.id)
+                          ? "bg-white/25 text-white/70 disabled:opacity-100"
+                          : "bg-red-500 text-white hover:bg-red-600"
+                      }
                       title={hasTransactions ? "Cannot delete card with existing transactions" : ""}
                     >
                       {deletingCardIds.has(card.id) && <LoaderCircle className="h-3 w-3 animate-spin" />}
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

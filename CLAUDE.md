@@ -20,6 +20,8 @@ Required in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — note: this project uses "publishable key", not the typical "anon key" name
 - `ANTHROPIC_API_KEY` — server-only (no `NEXT_PUBLIC_` prefix), used by the chat Route Handler (`app/api/chat/route.ts`) to call Claude
 
+Optional, for logging into the running app during UI work (e.g. screenshotting `/protected` with Playwright): `TEST_EMAIL` / `TEST_PASSWORD` in `.env.local`, a dedicated Supabase test account (not the user's real financial data). Not read by the app itself — only meant to be sourced manually when a throwaway authenticated session is needed. Clean up any periods/cards/transactions created against this account when done.
+
 ## Architecture
 
 This is a **financial transaction management app** — a single-page app behind Supabase auth. The root (`/`) redirects authenticated users to `/protected`, others to `/auth/login`.

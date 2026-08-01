@@ -56,4 +56,5 @@ export type TransactionManagerProps = {
   updateTransaction?: (transactionId: string, transaction: Partial<Transaction>) => Promise<Transaction>;
   deleteTransaction?: (transactionId: string) => Promise<void>;
   updatePeriodTotals?: (periodId: string, totals: { bankTotal?: number; totalSavings?: number }) => Promise<void>;
+  onOpenChat: () => void;
 };

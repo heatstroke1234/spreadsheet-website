@@ -11,6 +11,15 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CreditCard } from "../types";
 
 type TransactionDialogProps = {
@@ -78,81 +87,79 @@ export function TransactionDialog({
 
         <form className="mt-4 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txAmount">
-              Amount
-            </label>
-            <input
+            <Label htmlFor="txAmount">Amount</Label>
+            <Input
               id="txAmount"
               type="number"
               min={0.01}
               step={0.01}
               value={txAmount}
               onChange={(e) => onTxAmountChange(e.target.value)}
-              className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               required
               disabled={isLoading}
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txMethod">
-              Method
-            </label>
-            <select
-              id="txMethod"
+            <Label htmlFor="txMethod">Method</Label>
+            <Select
               value={txMethod}
-              onChange={(e) => onTxMethodChange(e.target.value as "debit" | "card" | "bank")}
-              className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              onValueChange={(value) => onTxMethodChange(value as "debit" | "card" | "bank")}
               disabled={isLoading}
             >
-              <option value="debit">Debit</option>
-              <option value="card">Credit Card</option>
-              <option value="bank">Bank Deposit</option>
-            </select>
+              <SelectTrigger id="txMethod" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="debit">Debit</SelectItem>
+                <SelectItem value="card">Credit Card</SelectItem>
+                <SelectItem value="bank">Bank Deposit</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {txMethod !== "bank" && (
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txCategory">
-                Category
-              </label>
-              <select
-                id="txCategory"
+              <Label htmlFor="txCategory">Category</Label>
+              <Select
                 value={txCategory}
-                onChange={(e) => onTxCategoryChange(e.target.value as "necessary" | "recreation")}
-                className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                onValueChange={(value) => onTxCategoryChange(value as "necessary" | "recreation")}
                 disabled={isLoading}
               >
-                <option value="necessary">Necessary</option>
-                <option value="recreation">Recreation</option>
-              </select>
+                <SelectTrigger id="txCategory" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="necessary">Necessary</SelectItem>
+                  <SelectItem value="recreation">Recreation</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
 
           {txMethod === "bank" && (
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txBankCategory">
-                Deposit Type
-              </label>
-              <select
-                id="txBankCategory"
+              <Label htmlFor="txBankCategory">Deposit Type</Label>
+              <Select
                 value={txBankCategory}
-                onChange={(e) => onTxBankCategoryChange(e.target.value as "transfer" | "salary")}
-                className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                onValueChange={(value) => onTxBankCategoryChange(value as "transfer" | "salary")}
                 disabled={isLoading}
               >
-                <option value="transfer">Transfer</option>
-                <option value="salary">Salary</option>
-              </select>
+                <SelectTrigger id="txBankCategory" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="salary">Salary</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
 
           {txMethod === "bank" && txBankCategory === "salary" && (
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txSavingsPercent">
-                Savings (%)
-              </label>
-              <input
+              <Label htmlFor="txSavingsPercent">Savings (%)</Label>
+              <Input
                 id="txSavingsPercent"
                 type="number"
                 min={0}
@@ -160,7 +167,6 @@ export function TransactionDialog({
                 step={1}
                 value={txSavingsPercent}
                 onChange={(e) => onTxSavingsPercentChange(e.target.value)}
-                className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 placeholder="e.g. 20"
                 disabled={isLoading}
               />
@@ -175,37 +181,29 @@ export function TransactionDialog({
 
           {txMethod === "card" && (
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txCardId">
-                Select Card
-              </label>
-              <select
-                id="txCardId"
-                value={txCardId}
-                onChange={(e) => onTxCardIdChange(e.target.value)}
-                className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                required
-                disabled={isLoading}
-              >
-                <option value="">Choose a card</option>
-                {cards.map((card) => (
-                  <option key={card.id} value={card.id}>
-                    {card.name}
-                  </option>
-                ))}
-              </select>
+              <Label htmlFor="txCardId">Select Card</Label>
+              <Select value={txCardId} onValueChange={onTxCardIdChange} disabled={isLoading}>
+                <SelectTrigger id="txCardId" className="w-full">
+                  <SelectValue placeholder="Choose a card" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cards.map((card) => (
+                    <SelectItem key={card.id} value={card.id}>
+                      {card.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="txDescription">
-              Description
-            </label>
-            <input
+            <Label htmlFor="txDescription">Description</Label>
+            <Input
               id="txDescription"
               type="text"
               value={txDescription}
               onChange={(e) => onTxDescriptionChange(e.target.value)}
-              className="w-full rounded border p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               placeholder="e.g. Grocery, utilities, refund"
               disabled={isLoading}
             />

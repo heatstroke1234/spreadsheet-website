@@ -30,6 +30,7 @@ export function PeriodManager() {
   const [periodSummaries, setPeriodSummaries] = useState<PeriodSummary[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
   const [isSwitchingPeriod, setIsSwitchingPeriod] = useState(false);
   const [periodService, setPeriodService] = useState<ReturnType<typeof createPeriodService> | null>(null);
 
@@ -281,7 +282,8 @@ export function PeriodManager() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-100">
+      <div className="flex min-h-100 items-center justify-center gap-2">
+        <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
         <p className="text-muted-foreground">Loading periods...</p>
       </div>
     );
@@ -303,9 +305,10 @@ export function PeriodManager() {
         updateTransaction={periodService ? updateTransaction : undefined}
         deleteTransaction={periodService ? deleteTransaction : undefined}
         updatePeriodTotals={periodService ? updatePeriodTotals : undefined}
+        onOpenChat={() => setChatOpen(true)}
       />
 
-      <ChatPanel currentPeriodId={currentPeriod?.id} />
+      <ChatPanel currentPeriodId={currentPeriod?.id} open={chatOpen} onOpenChange={setChatOpen} />
 
       <Dialog open={switchDialogOpen} onOpenChange={setSwitchDialogOpen}>
         <DialogContent>
