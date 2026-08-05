@@ -50,10 +50,13 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the
 
 Two supported paths — see `CLAUDE.md` for deployment internals:
 
-- **Docker (local/self-hosted):** builds a standalone image via the included `Dockerfile`.
+- **Docker (local/self-hosted):** builds a standalone image via the included `Dockerfile`. Add `output: 'standalone'` to `next.config.ts` first (the Dockerfile copies `.next/standalone`, which only exists with that flag set):
   ```bash
-  docker build --build-arg NEXT_PUBLIC_SUPABASE_URL=... --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... -t financials-management .
-  docker run -p 3000:3000 -e ANTHROPIC_API_KEY=... financials-management
+  docker build \
+    --build-arg NEXT_PUBLIC_SUPABASE_URL=... \
+    --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... \
+    -t spreadsheet-website .
+  docker run -p 3000:3000 -e ANTHROPIC_API_KEY=... spreadsheet-website
   ```
 - **AWS Amplify (automated):** pushes to `main` deploy automatically to `finance.nikhilv.net`. Infrastructure (Amplify app, IAM, Route 53) is managed with Terraform in `infra/`:
   ```bash
@@ -61,5 +64,8 @@ Two supported paths — see `CLAUDE.md` for deployment internals:
   terraform init
   export TF_VAR_supabase_url="https://..."
   export TF_VAR_supabase_publishable_key="sb_publishable_..."
+  export TF_VAR_anthropic_federation_rule_id="fdrl_..."
+  export TF_VAR_anthropic_organization_id="..."
+  export TF_VAR_anthropic_service_account_id="svac_..."
   terraform apply
   ```
