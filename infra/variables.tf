@@ -34,12 +34,6 @@ variable "supabase_publishable_key" {
   sensitive   = true
 }
 
-variable "anthropic_api_key" {
-  description = "Anthropic API key (ANTHROPIC_API_KEY) — server-only, used by the chat Route Handler. Kept as a fallback during the Workload Identity Federation migration; remove once the federated path is confirmed working in production."
-  type        = string
-  sensitive   = true
-}
-
 # Workload Identity Federation — lets the chat Route Handler authenticate to the Claude
 # API via AWS STS-issued tokens instead of the static API key above. These four are not
 # secrets (just identifiers naming the federation rule/service account/org/workspace in

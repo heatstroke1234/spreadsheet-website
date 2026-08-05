@@ -11,7 +11,7 @@ frontend:
         # default — Next.js server code (Route Handlers, Server Actions) doesn't see them
         # at runtime unless they're written into .env.production before the build, per
         # https://docs.aws.amazon.com/amplify/latest/userguide/ssr-environment-variables.html
-        - env | grep -E "^(ANTHROPIC_API_KEY|ANTHROPIC_FEDERATION_RULE_ID|ANTHROPIC_ORGANIZATION_ID|ANTHROPIC_SERVICE_ACCOUNT_ID|ANTHROPIC_WORKSPACE_ID)=" >> .env.production
+        - env | grep -E "^(ANTHROPIC_FEDERATION_RULE_ID|ANTHROPIC_ORGANIZATION_ID|ANTHROPIC_SERVICE_ACCOUNT_ID|ANTHROPIC_WORKSPACE_ID)=" >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next

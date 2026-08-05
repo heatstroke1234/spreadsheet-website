@@ -83,12 +83,10 @@ resource "aws_amplify_app" "main" {
   environment_variables = {
     NEXT_PUBLIC_SUPABASE_URL             = var.supabase_url
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = var.supabase_publishable_key
-    # Fallback auth for the chat route — kept until the WIF path below is confirmed
-    # working in production, then removed from here and the Anthropic Console.
-    ANTHROPIC_API_KEY = var.anthropic_api_key
-    # Workload Identity Federation — app/api/chat/anthropic-client.ts prefers this path
-    # automatically whenever all three required vars are present, no code change needed
-    # to cut over. ANTHROPIC_WORKSPACE_ID is optional; "" is treated as omitted.
+    # Workload Identity Federation — the sole production auth path for the chat route as
+    # of 2026-08-05 (confirmed live via a "[chat] Anthropic auth path: WIF" log line).
+    # No static ANTHROPIC_API_KEY here anymore; see CLAUDE.md's "Claude authentication"
+    # note. ANTHROPIC_WORKSPACE_ID is optional — "" is treated as omitted.
     ANTHROPIC_FEDERATION_RULE_ID = var.anthropic_federation_rule_id
     ANTHROPIC_ORGANIZATION_ID    = var.anthropic_organization_id
     ANTHROPIC_SERVICE_ACCOUNT_ID = var.anthropic_service_account_id

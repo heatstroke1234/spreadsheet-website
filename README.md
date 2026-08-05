@@ -61,6 +61,5 @@ Two supported paths — see `CLAUDE.md` for deployment internals:
   terraform init
   export TF_VAR_supabase_url="https://..."
   export TF_VAR_supabase_publishable_key="sb_publishable_..."
-  export TF_VAR_anthropic_api_key="sk-ant-..."
   terraform apply
   ```
