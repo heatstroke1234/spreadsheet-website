@@ -74,7 +74,13 @@ export function createAnthropicClient(): Anthropic {
   console.log(`[chat] Anthropic auth path: ${hasFederationConfig ? "WIF" : "API key"}`);
 
   if (hasFederationConfig) {
-    return new Anthropic({ credentials: federationAccessTokenProvider });
+    // Explicit apiKey: null, not just omitted — the SDK silently backfills apiKey from
+    // ANTHROPIC_API_KEY when the constructor arg is left undefined, and apiKey/authToken
+    // being non-null takes priority over `credentials` (see node_modules/@anthropic-ai/sdk
+    // /src/client.ts: "apiKey/authToken win over credentials/config/profile"). Without this,
+    // an ambient ANTHROPIC_API_KEY silently wins and `credentials` is never even consulted —
+    // confirmed live: this masked a real WIF misconfiguration for an entire deploy.
+    return new Anthropic({ apiKey: null, credentials: federationAccessTokenProvider });
   }
 
   return new Anthropic();
