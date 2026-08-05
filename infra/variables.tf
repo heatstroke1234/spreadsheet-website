@@ -22,12 +22,6 @@ variable "subdomain" {
   default     = "finance"
 }
 
-variable "github_token" {
-  description = "GitHub fine-grained PAT with Contents read + Webhooks write for this repo"
-  type        = string
-  sensitive   = true
-}
-
 variable "supabase_url" {
   description = "Supabase project URL (NEXT_PUBLIC_SUPABASE_URL)"
   type        = string
@@ -41,9 +35,35 @@ variable "supabase_publishable_key" {
 }
 
 variable "anthropic_api_key" {
-  description = "Anthropic API key (ANTHROPIC_API_KEY) — server-only, used by the chat Route Handler"
+  description = "Anthropic API key (ANTHROPIC_API_KEY) — server-only, used by the chat Route Handler. Kept as a fallback during the Workload Identity Federation migration; remove once the federated path is confirmed working in production."
   type        = string
   sensitive   = true
+}
+
+# Workload Identity Federation — lets the chat Route Handler authenticate to the Claude
+# API via AWS STS-issued tokens instead of the static API key above. These four are not
+# secrets (just identifiers naming the federation rule/service account/org/workspace in
+# the Anthropic Console), so unlike the vars above they aren't marked sensitive. See
+# CLAUDE.md for the full setup (AWS compute role, Anthropic Console federation rule).
+variable "anthropic_federation_rule_id" {
+  description = "Anthropic federation rule ID (ANTHROPIC_FEDERATION_RULE_ID, fdrl_...) from the Claude Console's Connect Workload wizard"
+  type        = string
+}
+
+variable "anthropic_organization_id" {
+  description = "Anthropic organization ID (ANTHROPIC_ORGANIZATION_ID) — Claude Console under Settings > Organization"
+  type        = string
+}
+
+variable "anthropic_service_account_id" {
+  description = "Anthropic service account ID (ANTHROPIC_SERVICE_ACCOUNT_ID, svac_...) created by the Connect Workload wizard"
+  type        = string
+}
+
+variable "anthropic_federation_workspace_id" {
+  description = "Anthropic workspace ID (ANTHROPIC_WORKSPACE_ID, wrkspc_... or \"default\") to scope the federated token to. Optional when the federation rule covers a single workspace — an empty string is treated as omitted."
+  type        = string
+  default     = ""
 }
 
 locals {

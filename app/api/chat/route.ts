@@ -1,8 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { createPeriodService } from "@/app/protected/transaction-manager/periodService";
 import { buildChatTools } from "./tools";
 import { buildSystemPrompt } from "./prompt";
+import { createAnthropicClient } from "./anthropic-client";
 import { CHAT_MODELS, DEFAULT_CHAT_MODEL_SELECTION, classifyModel, isChatModelSelection } from "./models";
 import type { ChatRequestBody, ChatStreamEvent } from "./types";
 
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   const tools = buildChatTools(periodService);
   const system = buildSystemPrompt(body.currentPeriodId);
 
-  const client = new Anthropic();
+  const client = createAnthropicClient();
   const runner = client.beta.messages.toolRunner({
     model,
     max_tokens: 8000,

@@ -95,6 +95,10 @@ Model: user-selectable per message via a dropdown in the chat panel footer — `
 
 **Web search** — `route.ts` appends Anthropic's server-side web_search tool (capped at `max_uses: 3`) to the tools array, alongside our own custom tools. Version is picked per-model, mirroring the `supportsAdaptiveThinking` pattern: `modelConfig.supportsDynamicWebSearch` (true for Opus 5/Sonnet 5, false for Haiku 4.5) selects `web_search_20260318` (dynamic filtering — better result accuracy/token efficiency) vs. the basic `web_search_20250305`. **This isn't just an optimization — confirmed live that `web_search_20260318` genuinely 400s on Haiku 4.5** ("does not support programmatic tool calling... set `allowed_callers=[\"direct\"]`"), so the branch is load-bearing, not cosmetic; don't collapse it back to one shared tool type without re-checking Haiku's error. `prompt.ts` scopes web_search narrowly: only for *general* personal-finance knowledge (savings rates, budgeting rules of thumb, current rate context) that helps interpret the user's data, never to look anything up about the user, and it doesn't reopen the door to fully off-topic questions. Server-side tool invocations arrive as a `server_tool_use` content block (not `tool_use`, which is only for our own client-executed tools) — `route.ts` checks for both so the "Looking up..." indicator covers web searches too; `chat-panel.tsx` gives it a friendlier label ("Searching the web…") via `toolStatusLabel()`.
 
+**Claude authentication** — `app/api/chat/anthropic-client.ts`'s `createAnthropicClient()` picks between two auth paths, checked at request time (not build time), so a redeploy is enough to switch between them with no code change:
+- **Workload Identity Federation (WIF)**, used in production — if `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID`, and `ANTHROPIC_SERVICE_ACCOUNT_ID` are all present, the client authenticates via a `credentials` provider that exchanges an AWS STS-issued OIDC token (`sts:GetWebIdentityToken`, requires "Outbound web identity federation" enabled at the AWS account level) for a short-lived `sk-ant-oat01-...` token via Anthropic's `/v1/oauth/token` federation endpoint — no long-lived API key ever touches the deployed environment. `oidcFederationProvider()` (from `@anthropic-ai/sdk/lib/credentials/oidc-federation`) performs a fresh token exchange on every call by design (federation grants don't return a refresh token) — it's wrapped in a `TokenCache` (`@anthropic-ai/sdk/lib/credentials/token-cache`) so a warm Lambda reuses the cached token instead of re-exchanging on every chat message; `sts`/`tokenCache` are module-scoped for the same reason. `ANTHROPIC_WORKSPACE_ID` is optional (only needed if the federation rule spans multiple workspaces); the Terraform variable defaults to `""`, which the SDK correctly treats as omitted rather than as a literal empty workspace id. The IAM role that Amplify's SSR Lambda assumes (`aws_iam_role.amplify_compute` in `infra/amplify.tf`, wired via `compute_role_arn` on `aws_amplify_app.main`) needs only `sts:GetWebIdentityToken` — nothing else.
+- **Static API key**, used locally — falls back to plain `new Anthropic()` (reads `ANTHROPIC_API_KEY` from the environment) whenever the federation vars aren't all present, which is how `.env.local` keeps working unchanged. This fallback is intentionally kept in production too (`ANTHROPIC_API_KEY` is still set in `infra/amplify.tf`) as a safety net during the WIF migration; remove it from both `infra/amplify.tf` and the Anthropic Console once WIF is confirmed working end-to-end, since the explicit `credentials` provider always wins over the env-var key regardless of order.
+
 **Multi-turn streaming gotcha:** the tool runner makes one API call per turn (commentary → tool call → tool result → next turn), and `route.ts` emits a `turn_break` event between turns so the client (`use-chat.ts`) knows to insert a paragraph break rather than concatenating two turns' text with no space. That break-insertion logic **must stay outside** any `setMessages(prev => ...)` updater — React Strict Mode (on by default in this app's dev mode) invokes updater functions twice to check purity, and mutating a ref *inside* the updater causes the second (committed) call to see the ref already cleared by the first. Read/clear the ref before calling `setMessages`, not inside it.
 
 ⚠️ **Streaming doesn't work on Amplify production, by design of the platform.** `route.ts` genuinely streams its `ReadableStream` response, and this works correctly locally (`next dev`) — but AWS Amplify Hosting's `WEB_COMPUTE` platform explicitly lists "Next.js streaming" under [unsupported features](https://docs.aws.amazon.com/amplify/latest/userguide/ssr-amplify-support.html); its Lambda-based compute buffers the entire response before returning it. In production, the chat panel's bouncing-dots/tool-indicator UI still covers the wait correctly (see the `isStreaming && !activeTool && ...` condition in `chat-panel.tsx`), but the user sees the full answer appear at once rather than token-by-token. There's no config fix for this — only options are accepting it, faking a client-side reveal, or moving off Amplify's compute (Vercel, or self-hosting the existing `Dockerfile` on a persistent-process host).
@@ -112,24 +116,29 @@ docker build \
 docker run -p 3000:3000 -e ANTHROPIC_API_KEY=... spreadsheet-website
 ```
 
-`NEXT_PUBLIC_*` vars are `--build-arg`s because they get inlined into the client bundle at build time. `ANTHROPIC_API_KEY` is server-only and read at request time by the chat Route Handler, so it's passed to `docker run` instead — never bake it into the image as a build arg.
+`NEXT_PUBLIC_*` vars are `--build-arg`s because they get inlined into the client bundle at build time. `ANTHROPIC_API_KEY` is server-only and read at request time by the chat Route Handler, so it's passed to `docker run` instead — never bake it into the image as a build arg. WIF is not wired up for Docker runs — outside Amplify's SSR Lambda there's no `sts:GetWebIdentityToken`-capable role to assume, so `ANTHROPIC_API_KEY` is required here regardless of production's auth path.
 
 ## Infrastructure & Deployment
 
 ### AWS infrastructure (`infra/`)
 Terraform (>= 1.6, AWS provider ~> 5.0) provisions:
 - **Amplify** — SSR hosting app (`WEB_COMPUTE` platform), `main` branch with auto-build on push, custom domain `finance.nikhilv.net`
-- **IAM** — Amplify service role (trust policy includes both `amplify.amazonaws.com` and `amplify.us-east-1.amazonaws.com`)
+- **IAM** — Amplify service role (build/CI, trust policy includes both `amplify.amazonaws.com` and `amplify.us-east-1.amazonaws.com`), plus a separate SSR compute role (`aws_iam_role.amplify_compute`, assumed by the actual SSR Lambda via `compute_role_arn` on `aws_amplify_app.main`) scoped to just `sts:GetWebIdentityToken` — this is what lets the chat route authenticate to Claude via Workload Identity Federation instead of a static key, see the "Claude authentication" note under AI chat assistant above
 - **Route 53** — CNAME records for the Amplify CloudFront distribution and ACM cert verification (uses existing `nikhilv.net` hosted zone; Amplify manages the ACM cert itself)
+
+The GitHub repo connection itself (`repository` on `aws_amplify_app.main`) is authorized via the AWS Amplify GitHub App, connected through the Console's reconnect flow — not a stored PAT. Terraform intentionally passes no `oauth_token`/`access_token`, so there's no GitHub credential to rotate or leak from this config; re-authorizing the connection (if it's ever revoked) has to happen in the Console, not via `terraform apply`.
 
 Apply:
 ```bash
 cd infra
 terraform init
-export TF_VAR_github_token="ghp_..."                    # classic GitHub PAT — fine-grained PATs do NOT work with Amplify oauth_token
 export TF_VAR_supabase_url="https://..."
 export TF_VAR_supabase_publishable_key="sb_publishable_..."
-export TF_VAR_anthropic_api_key="sk-ant-..."
+export TF_VAR_anthropic_api_key="sk-ant-..."             # kept as a fallback; see "Claude authentication" above
+export TF_VAR_anthropic_federation_rule_id="fdrl_..."     # from the Claude Console's Connect Workload wizard
+export TF_VAR_anthropic_organization_id="..."             # Claude Console > Settings > Organization
+export TF_VAR_anthropic_service_account_id="svac_..."     # from the Connect Workload wizard
+export TF_VAR_anthropic_federation_workspace_id="wrkspc_..." # optional — omit (or leave unset) if the rule covers one workspace
 terraform apply
 ```
 
