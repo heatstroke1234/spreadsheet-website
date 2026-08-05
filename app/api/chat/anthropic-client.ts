@@ -71,6 +71,8 @@ export function createAnthropicClient(): Anthropic {
     !!process.env.ANTHROPIC_ORGANIZATION_ID &&
     !!process.env.ANTHROPIC_SERVICE_ACCOUNT_ID;
 
+  console.log(`[chat] Anthropic auth path: ${hasFederationConfig ? "WIF" : "API key"}`);
+
   if (hasFederationConfig) {
     return new Anthropic({ credentials: federationAccessTokenProvider });
   }
